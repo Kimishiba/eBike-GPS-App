@@ -25,5 +25,5 @@ The act of associating a Board with a User as its Owner. A Board must be unpaire
 _Avoid_: Linking, registering
 
 **Geofence**:
-A circular zone (center point + radius) configured by a Board's Owner, marking a location where the Board is expected to be. A Board may have several Geofences at once — e.g. Home, Office, Gym. A Geofence is either **Permanent** (persists until the Owner removes it) or **Temporary** (expires after a duration the Owner can extend, then stops counting). The Board is considered safe whenever it is inside *any* of its Geofences; an alert fires only when it is inside none of them — not on exit from any single Geofence.
+A circular zone (center point + radius) configured by a Board's Owner, marking a location where the Board is expected to be. A Board may have several Geofences at once — e.g. Home, Office, Gym. A Geofence is either **Permanent** (persists until the Owner removes it) or **Temporary** (expires after a duration the Owner can extend, then stops counting). The Board is considered safe whenever it is inside *any* of its Geofences, or whenever any paired User's (Owner's or Member's) phone is within BLE range of it; an alert fires only when neither is true — not on exit from any single Geofence.
 _Avoid_: Safe zone, boundary
