@@ -12,6 +12,8 @@ import {
 import MapView, { Marker, Circle, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as LocalAuthentication from 'expo-local-authentication';
 
+import { useBleProximityDisarm } from '../hooks/useBleProximityDisarm';
+
 interface MapDashboardScreenProps {
   bike: any;
   onUnpair: () => void;
@@ -31,6 +33,12 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
   const [motorCutEnabled, setMotorCutEnabled] = useState<boolean>(false);
   const [reportingIntervalSecs, setReportingIntervalSecs] = useState<number>(60);
   const [commandStatus, setCommandStatus] = useState<string>('Applied');
+
+  // BLE Proximity Auto-Disarm Hook
+  const { scanning, currentRssi, disarmStatus } = useBleProximityDisarm(
+    bike?.deviceSecret || 'q0YjJ1RU...',
+    alarmArmed
+  );
 
   // Perform 2-Factor Motor Kill Confirmation
   const handleToggleMotorCut = async () => {
@@ -190,6 +198,24 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
               ))}
             </View>
             <Text style={styles.commandStatusText}>Command Receipt: {commandStatus}</Text>
+          </View>
+
+          {/* BLE Proximity Auto-Disarm Status Card */}
+          <View style={styles.controlCard}>
+            <Text style={styles.cardTitle}>📶 BLE Proximity Auto-Disarm</Text>
+            <Text style={styles.cardSubtitle}>
+              RSSI Gate: &gt;= -75 dBm (&lt; 2-3m proximity)
+            </Text>
+            <View style={{ marginTop: 8 }}>
+              <Text style={{ color: '#38BDF8', fontSize: 12, fontWeight: '600' }}>
+                Status: {disarmStatus}
+              </Text>
+              {currentRssi !== null && (
+                <Text style={{ color: '#94A3B8', fontSize: 11, marginTop: 2 }}>
+                  Signal Strength: {currentRssi} dBm
+                </Text>
+              )}
+            </View>
           </View>
 
           {/* Remote Motor Kill Safety Card */}
