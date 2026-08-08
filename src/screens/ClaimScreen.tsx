@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { claimBoardApi } from '../services/api';
+import { setDeviceSecret } from '../services/secureStorage';
 
 interface ClaimScreenProps {
   onClaimSuccess: (bikeData: any) => void;
@@ -90,10 +91,15 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
         geofenceRadiusMeters: geofenceRadius,
       });
 
+      const { deviceSecret, ...bikeWithoutSecret } = response.bike;
+      if (deviceSecret) {
+        await setDeviceSecret(response.bike.id, deviceSecret);
+      }
+
       Alert.alert('🎉 Board Paired!', `Successfully paired "${response.bike.nickname}" to your account.`, [
         {
           text: 'Open Map Dashboard',
-          onPress: () => onClaimSuccess(response.bike),
+          onPress: () => onClaimSuccess(bikeWithoutSecret),
         },
       ]);
     } catch (error: any) {

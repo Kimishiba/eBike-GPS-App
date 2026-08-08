@@ -13,6 +13,7 @@ import MapView, { Marker, Circle, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as LocalAuthentication from 'expo-local-authentication';
 
 import { useBleProximityDisarm } from '../hooks/useBleProximityDisarm';
+import { getDeviceSecret, getPairedBleDeviceId, setPairedBleDeviceId } from '../services/secureStorage';
 
 interface MapDashboardScreenProps {
   bike: any;
@@ -35,9 +36,23 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
   const [commandStatus, setCommandStatus] = useState<string>('Applied');
 
   // BLE Proximity Auto-Disarm Hook
+  const [deviceSecret, setDeviceSecret] = useState<string | null>(null);
+  const [pairedBleDeviceId, setPairedBleDeviceIdState] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!bike?.id) return;
+    getDeviceSecret(bike.id).then(setDeviceSecret);
+    getPairedBleDeviceId(bike.id).then(setPairedBleDeviceIdState);
+  }, [bike?.id]);
+
   const { scanning, currentRssi, disarmStatus } = useBleProximityDisarm(
-    bike?.deviceSecret || 'q0YjJ1RU...',
-    alarmArmed
+    deviceSecret,
+    alarmArmed,
+    pairedBleDeviceId,
+    (newDeviceId) => {
+      setPairedBleDeviceIdState(newDeviceId);
+      if (bike?.id) setPairedBleDeviceId(bike.id, newDeviceId);
+    }
   );
 
   // Perform 2-Factor Motor Kill Confirmation

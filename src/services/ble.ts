@@ -33,3 +33,12 @@ export function computeHmacResponse(challengeNonceHex: string, deviceSecret: str
 export function isWithinProximity(rssi: number): boolean {
   return rssi >= PROXIMITY_RSSI_THRESHOLD;
 }
+
+/**
+ * Gates the handshake to the specific board this app previously paired with, rather than any
+ * advertiser of the (public, spoofable) service UUID. `pairedDeviceId` is null only before the
+ * very first successful handshake for a bike, when there's nothing yet to pin against.
+ */
+export function isPairedDevice(deviceId: string, pairedDeviceId: string | null): boolean {
+  return pairedDeviceId === null || deviceId === pairedDeviceId;
+}

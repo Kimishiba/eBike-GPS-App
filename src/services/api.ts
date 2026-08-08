@@ -16,6 +16,8 @@ export interface ClaimResponse {
     ownerId: string;
     geofenceRadiusMeters: number;
     createdAt: string;
+    /** Per-board BLE disarm secret, provisioned at claim time. Never persist this on the `bike` object held in app state — move it into secure storage immediately (see src/services/secureStorage.ts) and drop the field. */
+    deviceSecret?: string;
   };
 }
 

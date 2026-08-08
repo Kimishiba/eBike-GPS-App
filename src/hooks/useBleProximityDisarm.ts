@@ -7,12 +7,18 @@ import {
   CHAR_HMAC_RESPONSE_UUID,
   PROXIMITY_RSSI_THRESHOLD,
   computeHmacResponse,
+  isPairedDevice,
   isWithinProximity,
 } from '../services/ble';
 
 const bleManager = new BleManager();
 
-export function useBleProximityDisarm(deviceSecret: string, isArmed: boolean) {
+export function useBleProximityDisarm(
+  deviceSecret: string | null,
+  isArmed: boolean,
+  pairedDeviceId: string | null,
+  onDevicePaired: (deviceId: string) => void
+) {
   const [scanning, setScanning] = useState<boolean>(false);
   const [connectedDevice, setConnectedDevice] = useState<Device | null>(null);
   const [currentRssi, setCurrentRssi] = useState<number | null>(null);
@@ -24,6 +30,7 @@ export function useBleProximityDisarm(deviceSecret: string, isArmed: boolean) {
         bleManager.stopDeviceScan();
         setScanning(false);
       }
+      setDisarmStatus(deviceSecret ? 'Idle' : 'Auto-disarm unavailable: no device secret provisioned');
       return;
     }
 
@@ -40,50 +47,58 @@ export function useBleProximityDisarm(deviceSecret: string, isArmed: boolean) {
           return;
         }
 
-        if (device && device.rssi !== null) {
-          setCurrentRssi(device.rssi);
+        if (!device || device.rssi === null) return;
 
-          // Check RSSI Proximity Gate (>= -75 dBm)
-          if (isWithinProximity(device.rssi)) {
-            bleManager.stopDeviceScan();
-            setScanning(false);
-            setDisarmStatus(`Proximity Matched (${device.rssi} dBm). Connecting...`);
+        // The service UUID is public and trivially spoofable by any nearby BLE peripheral,
+        // so only proceed with the board this app has previously completed a handshake with.
+        if (!isPairedDevice(device.id, pairedDeviceId)) return;
 
-            try {
-              const connected = await device.connect();
-              setConnectedDevice(connected);
-              await connected.discoverAllServicesAndCharacteristics();
+        setCurrentRssi(device.rssi);
 
-              // 1. Read 16-byte random challenge nonce from characteristic EBT2
-              const nonceChar = await connected.readCharacteristicForService(
-                BLE_SERVICE_UUID,
-                CHAR_CHALLENGE_NONCE_UUID
-              );
+        if (!isWithinProximity(device.rssi)) {
+          setDisarmStatus(`Out of Proximity (${device.rssi} dBm < ${PROXIMITY_RSSI_THRESHOLD} dBm)`);
+          return;
+        }
 
-              if (nonceChar.value) {
-                // Decode base64 to hex using CryptoJS
-                const nonceHex = CryptoJS.enc.Base64.parse(nonceChar.value).toString(CryptoJS.enc.Hex);
-                setDisarmStatus('Computing HMAC-SHA256 Challenge...');
+        bleManager.stopDeviceScan();
+        setScanning(false);
+        setDisarmStatus(`Proximity Matched (${device.rssi} dBm). Connecting...`);
 
-                // 2. Compute HMAC-SHA256(nonceHex, deviceSecret)
-                const hmacHex = computeHmacResponse(nonceHex, deviceSecret);
-                const hmacBase64 = CryptoJS.enc.Hex.parse(hmacHex).toString(CryptoJS.enc.Base64);
+        try {
+          const connected = await device.connect();
+          setConnectedDevice(connected);
+          await connected.discoverAllServicesAndCharacteristics();
 
-                // 3. Write 32-byte HMAC response to characteristic EBT3
-                await connected.writeCharacteristicWithResponseForService(
-                  BLE_SERVICE_UUID,
-                  CHAR_HMAC_RESPONSE_UUID,
-                  hmacBase64
-                );
+          // 1. Read 16-byte random challenge nonce from characteristic EBT2
+          const nonceChar = await connected.readCharacteristicForService(
+            BLE_SERVICE_UUID,
+            CHAR_CHALLENGE_NONCE_UUID
+          );
 
-                setDisarmStatus('🎉 Disarm Handshake Successful! (0ms Mute)');
-              }
-            } catch (err: any) {
-              setDisarmStatus(`Handshake Failed: ${err.message || 'BLE error'}`);
+          if (nonceChar.value) {
+            // Decode base64 to hex using CryptoJS
+            const nonceHex = CryptoJS.enc.Base64.parse(nonceChar.value).toString(CryptoJS.enc.Hex);
+            setDisarmStatus('Computing HMAC-SHA256 Challenge...');
+
+            // 2. Compute HMAC-SHA256(nonceHex, deviceSecret)
+            const hmacHex = computeHmacResponse(nonceHex, deviceSecret);
+            const hmacBase64 = CryptoJS.enc.Hex.parse(hmacHex).toString(CryptoJS.enc.Base64);
+
+            // 3. Write 32-byte HMAC response to characteristic EBT3
+            await connected.writeCharacteristicWithResponseForService(
+              BLE_SERVICE_UUID,
+              CHAR_HMAC_RESPONSE_UUID,
+              hmacBase64
+            );
+
+            if (!pairedDeviceId) {
+              onDevicePaired(connected.id);
             }
-          } else {
-            setDisarmStatus(`Out of Proximity (${device.rssi} dBm < ${PROXIMITY_RSSI_THRESHOLD} dBm)`);
+
+            setDisarmStatus('🎉 Disarm Handshake Successful! (0ms Mute)');
           }
+        } catch (err: any) {
+          setDisarmStatus(`Handshake Failed: ${err.message || 'BLE error'}`);
         }
       }
     );
@@ -91,7 +106,7 @@ export function useBleProximityDisarm(deviceSecret: string, isArmed: boolean) {
     return () => {
       bleManager.stopDeviceScan();
     };
-  }, [isArmed, deviceSecret]);
+  }, [isArmed, deviceSecret, pairedDeviceId]);
 
   return {
     scanning,
