@@ -4,7 +4,7 @@
 
 ### Issue tracker
 
-Issues live in this repo's GitHub Issues; external PRs are not a triage surface (private, solo-owned repo). See `docs/agents/issue-tracker.md`.
+Issues live in this repo's GitHub Issues; external PRs are not a triage surface (public but solo-owned repo — only the owner merges). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
