@@ -101,6 +101,23 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
     }
   };
 
+  const handleToggleArmStatus = async () => {
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    if (hasHardware) {
+      const authResult = await LocalAuthentication.authenticateAsync({
+        promptMessage: `Authenticate to ${alarmArmed ? 'DISARM' : 'ARM'} eBike security system`,
+        fallbackLabel: 'Use PIN',
+      });
+
+      if (!authResult.success) {
+        Alert.alert('Authentication Failed', 'Biometric confirmation required to change alarm status.');
+        return;
+      }
+    }
+
+    setAlarmArmed(!alarmArmed);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header Bar */}
@@ -117,7 +134,7 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
 
         <TouchableOpacity
           style={[styles.armBtn, alarmArmed ? styles.armBtnActive : styles.armBtnDisarmed]}
-          onPress={() => setAlarmArmed(!alarmArmed)}
+          onPress={handleToggleArmStatus}
         >
           <Text style={styles.armBtnText}>{alarmArmed ? '🔒 ARMED' : '🔓 DISARMED'}</Text>
         </TouchableOpacity>
