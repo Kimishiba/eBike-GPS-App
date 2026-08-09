@@ -13,6 +13,11 @@ import {
 
 const bleManager = new BleManager();
 
+// Paused: the claim flow (see ADR-0007) never issues a device_secret to the app — it's
+// generated at flash time and stored hashed only, so `deviceSecret` here can never be
+// populated as designed. See issue #24 before re-enabling.
+export const BLE_AUTO_DISARM_ENABLED = false;
+
 export function useBleProximityDisarm(
   deviceSecret: string | null,
   isArmed: boolean,
@@ -25,6 +30,11 @@ export function useBleProximityDisarm(
   const [disarmStatus, setDisarmStatus] = useState<string>('Idle');
 
   useEffect(() => {
+    if (!BLE_AUTO_DISARM_ENABLED) {
+      setDisarmStatus('Auto-disarm paused pending eBike-GPS-Tracker#28 (see issue #24)');
+      return;
+    }
+
     if (!isArmed || !deviceSecret) {
       if (scanning) {
         bleManager.stopDeviceScan();

@@ -12,7 +12,7 @@ import {
 import MapView, { Marker, Circle, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as LocalAuthentication from 'expo-local-authentication';
 
-import { useBleProximityDisarm } from '../hooks/useBleProximityDisarm';
+import { BLE_AUTO_DISARM_ENABLED, useBleProximityDisarm } from '../hooks/useBleProximityDisarm';
 import { getDeviceSecret, getPairedBleDeviceId, setPairedBleDeviceId } from '../services/secureStorage';
 
 interface MapDashboardScreenProps {
@@ -216,13 +216,13 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
           </View>
 
           {/* BLE Proximity Auto-Disarm Status Card */}
-          <View style={styles.controlCard}>
+          <View style={[styles.controlCard, !BLE_AUTO_DISARM_ENABLED && styles.controlCardPaused]}>
             <Text style={styles.cardTitle}>📶 BLE Proximity Auto-Disarm</Text>
             <Text style={styles.cardSubtitle}>
               RSSI Gate: &gt;= -75 dBm (&lt; 2-3m proximity)
             </Text>
             <View style={{ marginTop: 8 }}>
-              <Text style={{ color: '#38BDF8', fontSize: 12, fontWeight: '600' }}>
+              <Text style={{ color: BLE_AUTO_DISARM_ENABLED ? '#38BDF8' : '#94A3B8', fontSize: 12, fontWeight: '600' }}>
                 Status: {disarmStatus}
               </Text>
               {currentRssi !== null && (
@@ -387,6 +387,9 @@ const styles = StyleSheet.create({
   },
   controlCardDanger: {
     borderColor: '#EF4444',
+  },
+  controlCardPaused: {
+    opacity: 0.5,
   },
   cardTitle: {
     color: '#F8FAFC',
