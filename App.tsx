@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
+import { StyleSheet, View, ActivityIndicator, Platform, StatusBar } from 'react-native';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { ClaimScreen } from './src/screens/ClaimScreen';
 import { MapDashboardScreen } from './src/screens/MapDashboardScreen';
@@ -67,7 +67,7 @@ export default function App() {
   if (!authToken) {
     return (
       <View style={styles.container}>
-        <StatusBar style="light" />
+        <ExpoStatusBar style="light" translucent backgroundColor="#0F172A" />
         <LoginScreen
           onLoginSuccess={(token, userData) => {
             setAuthTokenState(token);
@@ -81,7 +81,7 @@ export default function App() {
   // Step 2: Authenticated ➔ MapDashboardScreen (if paired) OR ClaimScreen (if unclaimed)
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <ExpoStatusBar style="light" translucent backgroundColor="#0F172A" />
       {pairedBike ? (
         <MapDashboardScreen bike={pairedBike} onUnpair={handleUnpair} />
       ) : (
@@ -95,6 +95,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0F172A',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
   },
   loadingCenter: {
     justifyContent: 'center',
