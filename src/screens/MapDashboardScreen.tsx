@@ -42,20 +42,33 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
 
     const pollTelemetry = async () => {
       try {
-        const token = await getAuthToken();
-        const data = await fetchLatestTelemetryApi(bike?.id || 'bike_01', token);
+        const res = await fetchLatestTelemetryApi(bike?.id || 'bike_01', token);
+
+        // Normalize Fly.io payload structure (handles direct or nested telemetry/payload wrappers)
+        const data = res?.telemetry || res?.payload || res;
 
         if (data) {
-          if (data.lat && data.lon && (data.lat !== 0 || data.lon !== 0)) {
+          const lat = data.lat ?? data.latitude;
+          const lon = data.lon ?? data.longitude;
+          if (lat && lon && (Number(lat) !== 0 || Number(lon) !== 0)) {
             setLocation({
-              latitude: Number(data.lat),
-              longitude: Number(data.lon),
+              latitude: Number(lat),
+              longitude: Number(lon),
             });
           }
-          if (typeof data.speed === 'number') setSpeed(data.speed);
-          if (typeof data.battery_voltage === 'number') setBatteryVolts(data.battery_voltage);
-          if (typeof data.battery_percent === 'number') setBatteryPercent(data.battery_percent);
-          if (typeof data.sats_used === 'number') setSatsUsed(data.sats_used);
+
+          const speedVal = data.speed;
+          if (speedVal !== undefined && speedVal !== null) setSpeed(Number(speedVal));
+
+          const batV = data.battery_voltage ?? data.batteryVoltage ?? data.voltage;
+          if (batV !== undefined && batV !== null) setBatteryVolts(Number(batV));
+
+          const batP = data.battery_percent ?? data.batteryPercent ?? data.percent;
+          if (batP !== undefined && batP !== null) setBatteryPercent(Number(batP));
+
+          const sats = data.sats_used ?? data.satsUsed ?? data.sats;
+          if (sats !== undefined && sats !== null) setSatsUsed(Number(sats));
+
           setCommandStatus('Live Fly.io Stream');
         }
       } catch (err) {
