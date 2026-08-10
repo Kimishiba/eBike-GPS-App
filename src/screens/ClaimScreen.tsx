@@ -36,17 +36,28 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
   const handleBarcodeScanned = (scanningResult: any) => {
     if (step !== 1) return;
 
-    const rawData = scanningResult?.data || scanningResult?.data?.text || '';
-    if (!rawData) return;
+    let rawData = '';
+    if (typeof scanningResult === 'string') {
+      rawData = scanningResult;
+    } else if (scanningResult && typeof scanningResult.data === 'string') {
+      rawData = scanningResult.data;
+    } else if (scanningResult && scanningResult.data && typeof scanningResult.data.text === 'string') {
+      rawData = scanningResult.data.text;
+    }
+
+    if (!rawData || typeof rawData !== 'string') return;
 
     try {
       if (rawData.startsWith('ebike://claim')) {
         const idMatch = rawData.match(/[?&]id=([^&]+)/);
         const codeMatch = rawData.match(/[?&]code=([^&]+)/);
 
-        if (idMatch && codeMatch) {
-          setHardwareId(idMatch[1]);
-          setClaimCode(codeMatch[2].toUpperCase());
+        const foundId = idMatch && idMatch[1] ? idMatch[1] : '';
+        const foundCode = codeMatch && codeMatch[1] ? codeMatch[1] : '';
+
+        if (foundCode) {
+          if (foundId) setHardwareId(foundId);
+          setClaimCode(foundCode.toUpperCase());
           setStep(2);
           return;
         }
@@ -56,8 +67,8 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
       if (rawData.includes('code=')) {
         const matchCode = rawData.match(/code=([A-Za-z0-9_-]+)/i);
         const matchId = rawData.match(/id=([a-f0-9-]{36})/i);
-        if (matchCode) setClaimCode(matchCode[1].toUpperCase());
-        if (matchId) setHardwareId(matchId[1]);
+        if (matchCode && matchCode[1]) setClaimCode(matchCode[1].toUpperCase());
+        if (matchId && matchId[1]) setHardwareId(matchId[1]);
         setStep(2);
         return;
       }
