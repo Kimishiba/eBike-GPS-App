@@ -123,22 +123,7 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
         },
       ]);
     } catch (error: any) {
-      // Demo fallback if backend API endpoint is unreachable
-      const mockBike = {
-        id: 'bike_demo_1',
-        hardwareId: hardwareId || '71d0dad7-1afa-4328-9931-c7b07ee28238',
-        nickname: nickname.trim(),
-        ownerId: 'usr_demo_1',
-        geofenceRadiusMeters: geofenceRadius,
-        createdAt: new Date().toISOString(),
-      };
-
-      Alert.alert('🎉 Board Paired (Demo)!', `Successfully paired "${mockBike.nickname}".`, [
-        {
-          text: 'Open Map Dashboard',
-          onPress: () => onClaimSuccess(mockBike),
-        },
-      ]);
+      Alert.alert('Pairing Failed', error?.message || 'Unable to claim this board. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
