@@ -20,13 +20,26 @@ export default function App() {
   useEffect(() => {
     // Check saved session auth token & paired bike on launch
     Promise.all([getAuthToken(), getPairedBike()])
-      .then(([token, savedBike]) => {
+      .then(async ([token, savedBike]) => {
         if (token) {
           setAuthTokenState(token);
           setUser({ id: 'saved_user', email: 'user@ebike.app' });
         }
+
         if (savedBike) {
           setPairedBikeState(savedBike);
+        } else {
+          // If board is already flashed/provisioned, set default bike profile
+          const defaultBike = {
+            id: 'bike_01',
+            hardwareId: '71d0dad7-1afa-4328-9931-c7b07ee28238',
+            nickname: 'My LilyGO eBike',
+            ownerId: 'usr_demo_1',
+            geofenceRadiusMeters: 100,
+            createdAt: new Date().toISOString(),
+          };
+          await savePairedBike(defaultBike);
+          setPairedBikeState(defaultBike);
         }
       })
       .finally(() => setLoading(false));
