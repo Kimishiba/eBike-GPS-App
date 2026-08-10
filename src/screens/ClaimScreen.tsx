@@ -38,24 +38,30 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
 
     try {
       if (data.startsWith('ebike://claim')) {
-        const url = new URL(data);
-        const idParam = url.searchParams.get('id');
-        const codeParam = url.searchParams.get('code');
+        const idMatch = data.match(/[?&]id=([^&]+)/);
+        const codeMatch = data.match(/[?&]code=([^&]+)/);
 
-        if (idParam && codeParam) {
-          setHardwareId(idParam);
-          setClaimCode(codeParam.toUpperCase());
+        if (idMatch && codeMatch) {
+          setHardwareId(idMatch[1]);
+          setClaimCode(codeMatch[2].toUpperCase());
           setStep(2);
           return;
         }
       }
 
-      // Direct fallback parsing for JSON or raw text
+      // Direct fallback parsing for query params or raw text
       if (data.includes('code=')) {
-        const matchCode = data.match(/code=([A-Z0-9]{8})/i);
+        const matchCode = data.match(/code=([A-Za-z0-9_-]+)/i);
         const matchId = data.match(/id=([a-f0-9-]{36})/i);
         if (matchCode) setClaimCode(matchCode[1].toUpperCase());
         if (matchId) setHardwareId(matchId[1]);
+        setStep(2);
+        return;
+      }
+
+      // Raw text code fallback
+      if (data.trim().length >= 4) {
+        setClaimCode(data.trim().toUpperCase());
         setStep(2);
         return;
       }
@@ -68,8 +74,8 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
 
   const handleManualNext = () => {
     const cleanCode = claimCode.trim().toUpperCase();
-    if (cleanCode.length < 8) {
-      Alert.alert('Invalid Claim Code', 'Please enter a valid 8-character Base32 claim code.');
+    if (cleanCode.length < 3) {
+      Alert.alert('Invalid Claim Code', 'Please enter a valid claim code.');
       return;
     }
     setClaimCode(cleanCode);
@@ -154,6 +160,9 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
             <CameraView
               style={styles.camera}
               facing="back"
+              barcodeScannerSettings={{
+                barcodeTypes: ['qr'],
+              }}
               onBarcodeScanned={handleBarcodeScanned}
             >
               <View style={styles.overlayContainer}>
