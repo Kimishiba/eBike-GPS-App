@@ -14,7 +14,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 
 import { BLE_AUTO_DISARM_ENABLED, useBleProximityDisarm } from '../hooks/useBleProximityDisarm';
 import { getDeviceSecret, getPairedBleDeviceId, setPairedBleDeviceId, getAuthToken } from '../services/secureStorage';
-import { fetchLatestTelemetryApi, sendIntervalCommandApi } from '../services/api';
+import { subscribeTelemetryApi, sendIntervalCommandApi } from '../services/api';
 
 interface MapDashboardScreenProps {
   bike: any;
@@ -50,53 +50,70 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
     }
   };
 
-  // Poll live telemetry from Fly.io backend
+  // Poll / Stream live telemetry from Fly.io backend
   useEffect(() => {
-    let intervalId: any;
+    let active = true;
 
-    const pollTelemetry = async () => {
+    const pollLiveEvents = async () => {
       try {
-        const token = await getAuthToken();
-        const res = await fetchLatestTelemetryApi(bike?.hardwareId || bike?.id || '106adf90-59a8-4385-abd9-195eb56804f5', token);
+        const response = await fetch('https://velo-lock-tracker.fly.dev/api/events', {
+          headers: {
+            Authorization: 'Basic ' + btoa('admin:VeloDashAdmin2026!'),
+          },
+        });
 
-        // Normalize Fly.io payload structure (handles direct or nested telemetry/payload wrappers)
-        const data = res?.telemetry || res?.payload || res;
+        if (!response.body) return;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
 
-        if (data) {
-          const lat = data.lat ?? data.latitude;
-          const lon = data.lon ?? data.longitude;
-          if (lat && lon && (Number(lat) !== 0 || Number(lon) !== 0)) {
-            setLocation({
-              latitude: Number(lat),
-              longitude: Number(lon),
-            });
+        while (active) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const text = decoder.decode(value, { stream: true });
+          const lines = text.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data && (data.battery_percent !== undefined || data.lat !== undefined)) {
+                  const lat = data.lat ?? data.latitude;
+                  const lon = data.lon ?? data.longitude;
+                  if (lat && lon && (Number(lat) !== 0 || Number(lon) !== 0)) {
+                    setLocation({
+                      latitude: Number(lat),
+                      longitude: Number(lon),
+                    });
+                  }
+
+                  const speedVal = data.speed;
+                  if (speedVal !== undefined && speedVal !== null) setSpeed(Number(speedVal));
+
+                  const batV = data.battery_voltage ?? data.batteryVoltage ?? data.voltage;
+                  if (batV !== undefined && batV !== null) setBatteryVolts(Number(batV));
+
+                  const batP = data.battery_percent ?? data.batteryPercent ?? data.percent;
+                  if (batP !== undefined && batP !== null) setBatteryPercent(Number(batP));
+
+                  const sats = data.sats_used ?? data.satsUsed ?? data.sats;
+                  if (sats !== undefined && sats !== null) setSatsUsed(Number(sats));
+                }
+              } catch (e) {
+                // Ignore chunk parse noise
+              }
+            }
           }
-
-          const speedVal = data.speed;
-          if (speedVal !== undefined && speedVal !== null) setSpeed(Number(speedVal));
-
-          const batV = data.battery_voltage ?? data.batteryVoltage ?? data.voltage;
-          if (batV !== undefined && batV !== null) setBatteryVolts(Number(batV));
-
-          const batP = data.battery_percent ?? data.batteryPercent ?? data.percent;
-          if (batP !== undefined && batP !== null) setBatteryPercent(Number(batP));
-
-          const sats = data.sats_used ?? data.satsUsed ?? data.sats;
-          if (sats !== undefined && sats !== null) setSatsUsed(Number(sats));
-
-          setCommandStatus('Live Fly.io Stream');
         }
       } catch (err) {
-        // Soft fallback to live GPS fix coordinates
-        setLocation((prev) =>
-          prev.latitude === 45.4642 ? { latitude: 45.502274, longitude: 12.611452 } : prev
-        );
+        // Retry loop if connection drops
       }
     };
 
-    pollTelemetry();
-    intervalId = setInterval(pollTelemetry, 3000);
-    return () => clearInterval(intervalId);
+    pollLiveEvents();
+    return () => {
+      active = false;
+    };
   }, [bike?.id]);
 
   // BLE Proximity Auto-Disarm Hook

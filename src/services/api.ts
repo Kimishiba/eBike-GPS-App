@@ -95,28 +95,32 @@ export async function claimBoardApi(
   return response.json();
 }
 
-export async function fetchLatestTelemetryApi(
-  bikeId: string,
-  token?: string | null,
+export function subscribeTelemetryApi(
+  onTelemetry: (data: any) => void,
   apiBaseUrl: string = DEFAULT_API_BASE_URL
-): Promise<any> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`${apiBaseUrl}/api/v1/bikes/${bikeId}/telemetry/latest`, {
-    method: 'GET',
-    headers,
+): () => void {
+  const credentials = btoa('admin:VeloDashAdmin2026!');
+  
+  // Connect to live Fly.io SSE stream with Basic Auth
+  const eventSource = new EventSource(`${apiBaseUrl}/api/events`, {
+    headers: { Authorization: `Basic ${credentials}` },
   });
 
-  if (!response.ok) {
-    throw new Error(`Telemetry fetch failed with status ${response.status}`);
-  }
+  const messageHandler = (event: any) => {
+    try {
+      const data = JSON.parse(event.data);
+      if (data) onTelemetry(data);
+    } catch (e) {
+      // Ignore parse errors
+    }
+  };
 
-  return response.json();
+  eventSource.addEventListener('telemetry', messageHandler);
+
+  return () => {
+    eventSource.removeEventListener('telemetry', messageHandler);
+    eventSource.close();
+  };
 }
 
 export async function sendIntervalCommandApi(
