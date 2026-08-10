@@ -4,25 +4,43 @@ import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { ClaimScreen } from './src/screens/ClaimScreen';
 import { MapDashboardScreen } from './src/screens/MapDashboardScreen';
-import { getAuthToken } from './src/services/secureStorage';
+import {
+  getAuthToken,
+  getPairedBike,
+  setPairedBike as savePairedBike,
+  deletePairedBike,
+} from './src/services/secureStorage';
 
 export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [authToken, setAuthTokenState] = useState<string | null>(null);
   const [user, setUser] = useState<any | null>(null);
-  const [pairedBike, setPairedBike] = useState<any | null>(null);
+  const [pairedBike, setPairedBikeState] = useState<any | null>(null);
 
   useEffect(() => {
-    // Check saved session auth token on app launch
-    getAuthToken()
-      .then((token) => {
+    // Check saved session auth token & paired bike on launch
+    Promise.all([getAuthToken(), getPairedBike()])
+      .then(([token, savedBike]) => {
         if (token) {
           setAuthTokenState(token);
           setUser({ id: 'saved_user', email: 'user@ebike.app' });
         }
+        if (savedBike) {
+          setPairedBikeState(savedBike);
+        }
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const handleClaimSuccess = async (bikeData: any) => {
+    await savePairedBike(bikeData);
+    setPairedBikeState(bikeData);
+  };
+
+  const handleUnpair = async () => {
+    await deletePairedBike();
+    setPairedBikeState(null);
+  };
 
   if (loading) {
     return (
@@ -52,9 +70,9 @@ export default function App() {
     <View style={styles.container}>
       <StatusBar style="light" />
       {pairedBike ? (
-        <MapDashboardScreen bike={pairedBike} onUnpair={() => setPairedBike(null)} />
+        <MapDashboardScreen bike={pairedBike} onUnpair={handleUnpair} />
       ) : (
-        <ClaimScreen onClaimSuccess={(bikeData) => setPairedBike(bikeData)} />
+        <ClaimScreen onClaimSuccess={handleClaimSuccess} />
       )}
     </View>
   );
