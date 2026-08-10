@@ -56,7 +56,8 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
 
     const pollTelemetry = async () => {
       try {
-        const res = await fetchLatestTelemetryApi(bike?.id || 'bike_01', token);
+        const token = await getAuthToken();
+        const res = await fetchLatestTelemetryApi(bike?.hardwareId || bike?.id || '106adf90-59a8-4385-abd9-195eb56804f5', token);
 
         // Normalize Fly.io payload structure (handles direct or nested telemetry/payload wrappers)
         const data = res?.telemetry || res?.payload || res;

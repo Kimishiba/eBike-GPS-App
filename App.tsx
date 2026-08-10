@@ -31,8 +31,8 @@ export default function App() {
         } else {
           // If board is already flashed/provisioned, set default bike profile
           const defaultBike = {
-            id: 'bike_01',
-            hardwareId: '71d0dad7-1afa-4328-9931-c7b07ee28238',
+            id: '106adf90-59a8-4385-abd9-195eb56804f5',
+            hardwareId: '106adf90-59a8-4385-abd9-195eb56804f5',
             nickname: 'My LilyGO eBike',
             ownerId: 'usr_demo_1',
             geofenceRadiusMeters: 100,
