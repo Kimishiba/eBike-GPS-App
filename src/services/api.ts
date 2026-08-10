@@ -127,10 +127,8 @@ export async function sendIntervalCommandApi(
 ): Promise<any> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'Authorization': 'Basic ' + btoa('admin:VeloDashAdmin2026!'),
   };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
 
   const intervalMs = intervalSeconds * 1000;
   const payload = JSON.stringify({
@@ -146,7 +144,7 @@ export async function sendIntervalCommandApi(
     body: payload,
   }).catch(() => null);
 
-  // Fallback to legacy endpoint path if v1 return 404 or fails
+  // Fallback to legacy endpoint path if v1 returns 404 or fails
   if (!response || !response.ok) {
     response = await fetch(`${apiBaseUrl}/api/config/interval`, {
       method: 'POST',
