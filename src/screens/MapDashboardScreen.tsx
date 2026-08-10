@@ -28,13 +28,13 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
     longitude: 12.611452,
   });
   const [speed, setSpeed] = useState<number>(0.0);
-  const [batteryVolts, setBatteryVolts] = useState<number>(4.15);
-  const [batteryPercent, setBatteryPercent] = useState<number>(95);
-  const [satsUsed, setSatsUsed] = useState<number>(9);
+  const [batteryVolts, setBatteryVolts] = useState<number | null>(null);
+  const [batteryPercent, setBatteryPercent] = useState<number | null>(null);
+  const [satsUsed, setSatsUsed] = useState<number | null>(null);
   const [alarmArmed, setAlarmArmed] = useState<boolean>(true);
   const [motorCutEnabled, setMotorCutEnabled] = useState<boolean>(false);
   const [reportingIntervalSecs, setReportingIntervalSecs] = useState<number>(60);
-  const [commandStatus, setCommandStatus] = useState<string>('Live Fly.io Sync');
+  const [commandStatus, setCommandStatus] = useState<string>('Waiting for Next Board Broadcast...');
 
   const handleSelectInterval = async (val: number) => {
     setReportingIntervalSecs(val);
@@ -264,13 +264,19 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
 
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>BATTERY LEVEL</Text>
-              <Text style={styles.metricValue}>{batteryPercent}%</Text>
-              <Text style={styles.metricUnit}>{batteryVolts.toFixed(2)}V Cell</Text>
+              <Text style={styles.metricValue}>
+                {batteryPercent !== null ? `${batteryPercent}%` : '--'}
+              </Text>
+              <Text style={styles.metricUnit}>
+                {batteryVolts !== null ? `${batteryVolts.toFixed(2)}V Cell` : 'Syncing...'}
+              </Text>
             </View>
 
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>GPS SATELLITES</Text>
-              <Text style={styles.metricValue}>{satsUsed}</Text>
+              <Text style={styles.metricValue}>
+                {satsUsed !== null ? satsUsed : '--'}
+              </Text>
               <Text style={styles.metricUnit}>Fixed 3D</Text>
             </View>
           </View>
