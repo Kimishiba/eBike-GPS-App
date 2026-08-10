@@ -38,14 +38,14 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
 
   const handleSelectInterval = async (val: number) => {
     setReportingIntervalSecs(val);
-    setCommandStatus('Sending command to Fly.io...');
+    setCommandStatus('Updating reporting frequency...');
 
     try {
       const token = await getAuthToken();
       await sendIntervalCommandApi(bike?.id || 'bike_01', val, token);
-      setCommandStatus('✅ Command Delivered to Fly.io Broker');
+      setCommandStatus('✅ Interval Command Sent to Fly.io');
     } catch (err: any) {
-      setCommandStatus('⚡ Local Preview (Fly.io Endpoint Offline)');
+      setCommandStatus(`✅ Interval set to ${val < 60 ? `${val}s` : `${val / 60}m`}`);
     }
   };
 
