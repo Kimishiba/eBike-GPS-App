@@ -11,12 +11,18 @@ import {
   isWithinProximity,
 } from '../services/ble';
 
-const bleManager = new BleManager();
-
 // Paused: the claim flow (see ADR-0007) never issues a device_secret to the app — it's
 // generated at flash time and stored hashed only, so `deviceSecret` here can never be
 // populated as designed. See issue #24 before re-enabling.
 export const BLE_AUTO_DISARM_ENABLED = false;
+
+let bleManagerInstance: BleManager | null = null;
+function getBleManager(): BleManager {
+  if (!bleManagerInstance) {
+    bleManagerInstance = new BleManager();
+  }
+  return bleManagerInstance;
+}
 
 export function useBleProximityDisarm(
   deviceSecret: string | null,
@@ -37,7 +43,7 @@ export function useBleProximityDisarm(
 
     if (!isArmed || !deviceSecret) {
       if (scanning) {
-        bleManager.stopDeviceScan();
+        getBleManager().stopDeviceScan();
         setScanning(false);
       }
       setDisarmStatus(deviceSecret ? 'Idle' : 'Auto-disarm unavailable: no device secret provisioned');
@@ -47,7 +53,7 @@ export function useBleProximityDisarm(
     setScanning(true);
     setDisarmStatus('Scanning for eBike Tracker BLE...');
 
-    bleManager.startDeviceScan(
+    getBleManager().startDeviceScan(
       [BLE_SERVICE_UUID],
       { allowDuplicates: false },
       async (error: any, device: any) => {
@@ -70,7 +76,7 @@ export function useBleProximityDisarm(
           return;
         }
 
-        bleManager.stopDeviceScan();
+        getBleManager().stopDeviceScan();
         setScanning(false);
         setDisarmStatus(`Proximity Matched (${device.rssi} dBm). Connecting...`);
 
@@ -114,7 +120,9 @@ export function useBleProximityDisarm(
     );
 
     return () => {
-      bleManager.stopDeviceScan();
+      if (bleManagerInstance) {
+        bleManagerInstance.stopDeviceScan();
+      }
     };
   }, [isArmed, deviceSecret, pairedDeviceId]);
 
