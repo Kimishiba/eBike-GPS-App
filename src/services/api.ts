@@ -104,7 +104,7 @@ export function subscribeTelemetryApi(
   // Connect to live Fly.io SSE stream with Basic Auth
   const eventSource = new EventSource(`${apiBaseUrl}/api/events`, {
     headers: { Authorization: `Basic ${credentials}` },
-  });
+  } as EventSourceInit);
 
   const messageHandler = (event: any) => {
     try {
