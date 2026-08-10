@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE_URL = 'http://192.168.68.58:8181';
+const DEFAULT_API_BASE_URL = 'https://velo-lock-tracker.fly.dev';
 
 export interface AuthResponse {
   success: boolean;
