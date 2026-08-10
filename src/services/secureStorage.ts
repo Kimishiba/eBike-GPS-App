@@ -2,6 +2,19 @@ import * as SecureStore from 'expo-secure-store';
 
 const deviceSecretKey = (bikeId: string) => `ebike_${bikeId}_device_secret`;
 const pairedBleDeviceIdKey = (bikeId: string) => `ebike_${bikeId}_paired_ble_device_id`;
+const AUTH_TOKEN_KEY = 'ebike_user_auth_token';
+
+export function getAuthToken(): Promise<string | null> {
+  return SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+}
+
+export function setAuthToken(token: string): Promise<void> {
+  return SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+}
+
+export function deleteAuthToken(): Promise<void> {
+  return SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+}
 
 export function getDeviceSecret(bikeId: string): Promise<string | null> {
   return SecureStore.getItemAsync(deviceSecretKey(bikeId));
