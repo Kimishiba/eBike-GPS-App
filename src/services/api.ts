@@ -94,3 +94,27 @@ export async function claimBoardApi(
 
   return response.json();
 }
+
+export async function fetchLatestTelemetryApi(
+  bikeId: string,
+  token?: string | null,
+  apiBaseUrl: string = DEFAULT_API_BASE_URL
+): Promise<any> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/v1/bikes/${bikeId}/telemetry/latest`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Telemetry fetch failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
