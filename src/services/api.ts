@@ -132,15 +132,32 @@ export async function sendIntervalCommandApi(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${apiBaseUrl}/api/v1/bikes/${bikeId}/config/interval`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ intervalSeconds }),
+  const intervalMs = intervalSeconds * 1000;
+  const payload = JSON.stringify({
+    interval: intervalMs,
+    intervalSeconds,
+    intervalMs,
   });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ message: 'Failed to update interval' }));
-    throw new Error(errorData.message || `Interval update failed with status ${response.status}`);
+  // Try standard v1 endpoint path
+  let response = await fetch(`${apiBaseUrl}/api/v1/bikes/${bikeId}/config/interval`, {
+    method: 'POST',
+    headers,
+    body: payload,
+  }).catch(() => null);
+
+  // Fallback to legacy endpoint path if v1 return 404 or fails
+  if (!response || !response.ok) {
+    response = await fetch(`${apiBaseUrl}/api/config/interval`, {
+      method: 'POST',
+      headers,
+      body: payload,
+    }).catch(() => null);
+  }
+
+  if (!response || !response.ok) {
+    const statusText = response ? `status ${response.status}` : 'network error';
+    throw new Error(`Interval update failed: ${statusText}`);
   }
 
   return response.json();
