@@ -1,0 +1,62 @@
+name: Android Emulator E2E Tests (Maestro)
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  maestro-e2e:
+    name: Run Maestro E2E Tests on Android Emulator
+    runs-on: macos-13
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prebuild Native Android Project
+        run: npx expo prebuild --platform android --clean
+
+      - name: Export JS Bundle & Build APK
+        run: |
+          npx expo export --platform android
+          cd android
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Install Maestro CLI
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Run E2E Tests on Android Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 31
+          target: default
+          arch: x86_64
+          profile: Pixel_6
+          script: |
+            adb install android/app/build/outputs/apk/debug/app-debug.apk
+            $HOME/.maestro/bin/maestro test .maestro/smoke-test.yaml
+
+      - name: Upload Maestro Test Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-e2e-results
+          path: ~/.maestro/tests/
