@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0F172A',
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
+    paddingTop: Platform.OS === 'android' ? 20 : 0,
   },
   loadingCenter: {
     justifyContent: 'center',
