@@ -1,5 +1,15 @@
 const DEFAULT_API_BASE_URL = 'http://192.168.68.58:8181';
 
+export interface AuthResponse {
+  success: boolean;
+  token: string;
+  user: {
+    id: string;
+    email: string;
+    name: string;
+  };
+}
+
 export interface ClaimRequest {
   hardwareId: string;
   claimCode: string;
@@ -16,20 +26,64 @@ export interface ClaimResponse {
     ownerId: string;
     geofenceRadiusMeters: number;
     createdAt: string;
-    /** Per-board BLE disarm secret, provisioned at claim time. Never persist this on the `bike` object held in app state — move it into secure storage immediately (see src/services/secureStorage.ts) and drop the field. */
     deviceSecret?: string;
   };
 }
 
+export async function loginApi(
+  email: string,
+  pass: string,
+  apiBaseUrl: string = DEFAULT_API_BASE_URL
+): Promise<AuthResponse> {
+  const response = await fetch(`${apiBaseUrl}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: pass }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: 'Login failed' }));
+    throw new Error(errorData.message || `Login failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function registerApi(
+  email: string,
+  pass: string,
+  name: string,
+  apiBaseUrl: string = DEFAULT_API_BASE_URL
+): Promise<AuthResponse> {
+  const response = await fetch(`${apiBaseUrl}/api/v1/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: pass, name }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: 'Registration failed' }));
+    throw new Error(errorData.message || `Registration failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export async function claimBoardApi(
   payload: ClaimRequest,
+  token?: string | null,
   apiBaseUrl: string = DEFAULT_API_BASE_URL
 ): Promise<ClaimResponse> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${apiBaseUrl}/api/v1/bikes/claim`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify(payload),
   });
 
