@@ -118,3 +118,30 @@ export async function fetchLatestTelemetryApi(
 
   return response.json();
 }
+
+export async function sendIntervalCommandApi(
+  bikeId: string,
+  intervalSeconds: number,
+  token?: string | null,
+  apiBaseUrl: string = DEFAULT_API_BASE_URL
+): Promise<any> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/v1/bikes/${bikeId}/config/interval`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ intervalSeconds }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ message: 'Failed to update interval' }));
+    throw new Error(errorData.message || `Interval update failed with status ${response.status}`);
+  }
+
+  return response.json();
+}

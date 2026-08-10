@@ -14,7 +14,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 
 import { BLE_AUTO_DISARM_ENABLED, useBleProximityDisarm } from '../hooks/useBleProximityDisarm';
 import { getDeviceSecret, getPairedBleDeviceId, setPairedBleDeviceId, getAuthToken } from '../services/secureStorage';
-import { fetchLatestTelemetryApi } from '../services/api';
+import { fetchLatestTelemetryApi, sendIntervalCommandApi } from '../services/api';
 
 interface MapDashboardScreenProps {
   bike: any;
@@ -35,6 +35,19 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
   const [motorCutEnabled, setMotorCutEnabled] = useState<boolean>(false);
   const [reportingIntervalSecs, setReportingIntervalSecs] = useState<number>(60);
   const [commandStatus, setCommandStatus] = useState<string>('Live Fly.io Sync');
+
+  const handleSelectInterval = async (val: number) => {
+    setReportingIntervalSecs(val);
+    setCommandStatus('Sending command to Fly.io...');
+
+    try {
+      const token = await getAuthToken();
+      await sendIntervalCommandApi(bike?.id || 'bike_01', val, token);
+      setCommandStatus('✅ Command Delivered to Fly.io Broker');
+    } catch (err: any) {
+      setCommandStatus('⚡ Local Preview (Fly.io Endpoint Offline)');
+    }
+  };
 
   // Poll live telemetry from Fly.io backend
   useEffect(() => {
@@ -262,10 +275,7 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
                     styles.intervalChip,
                     reportingIntervalSecs === opt.val && styles.intervalChipActive,
                   ]}
-                  onPress={() => {
-                    setReportingIntervalSecs(opt.val);
-                    setCommandStatus('Queued in #23 Table');
-                  }}
+                  onPress={() => handleSelectInterval(opt.val)}
                 >
                   <Text
                     style={[
