@@ -476,26 +476,6 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
           <Text style={styles.logoutBtnText}>LOG OUT</Text>
         </TouchableOpacity>
       </ScrollView>
-
-      {/* Stitch Tactical Bottom Nav Bar */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => onSelectTab('security')}>
-          <Text style={styles.navIcon}>🏠</Text>
-          <Text style={[styles.navLabel, activeTab === 'security' && styles.navLabelActive]}>HOME</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => onSelectTab('security')}>
-          <Text style={styles.navIcon}>🛡️</Text>
-          <Text style={[styles.navLabel, activeTab === 'security' && styles.navLabelActive]}>SECURITY</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => onSelectTab('garage')}>
-          <Text style={styles.navIcon}>🚲</Text>
-          <Text style={[styles.navLabel, activeTab === 'garage' && styles.navLabelActive]}>GARAGE</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => onSelectTab('account')}>
-          <Text style={styles.navIcon}>👤</Text>
-          <Text style={[styles.navLabel, activeTab === 'account' && styles.navLabelActive]}>ACCOUNT</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
