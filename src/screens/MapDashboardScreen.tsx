@@ -86,14 +86,8 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
   const [reportingIntervalSecs, setReportingIntervalSecs] = useState<number>(60);
   const [commandStatus, setCommandStatus] = useState<string>('Uplink Active');
 
-  // Logs for Activity Log accordion
-  const [activityLogs, setActivityLogs] = useState<Array<{ ts: string; msg: string; highlight?: boolean }>>([
-    { ts: '10:42:01', msg: 'Uplink Established' },
-    { ts: '10:41:15', msg: 'BT Handshake OK' },
-    { ts: '10:40:00', msg: 'Ignition Detected' },
-    { ts: '10:35:12', msg: 'Shock Warning', highlight: true },
-    { ts: '10:00:00', msg: 'System Armed' },
-  ]);
+  // Logs for Activity Log accordion (live board feed)
+  const [activityLogs, setActivityLogs] = useState<Array<{ ts: string; msg: string; highlight?: boolean }>>([]);
 
   const [lastFrameAt, setLastFrameAt] = useState<number | null>(null);
   const [lastErrorAt, setLastErrorAt] = useState<number | null>(null);
@@ -114,15 +108,16 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
       const res = await sendIntervalCommandApi(bike.id, val, token);
       const cmdId = res?.command_id ? ` (#${res.command_id})` : '';
       setCommandStatus(`✅ Sent to Broker${cmdId}`);
-      setActivityLogs((prev) => [{ ts: new Date().toTimeString().slice(0, 8), msg: `Interval -> ${val}s` }, ...prev]);
+      setActivityLogs((prev) => [
+        { ts: new Date().toTimeString().slice(0, 8), msg: `Command -> Set Interval ${val}s${cmdId}`, highlight: true },
+        ...prev.slice(0, 49),
+      ]);
     } catch (err: any) {
       setCommandStatus(`⚠️ Transmit Error: ${err.message || 'Failed'}`);
     }
   };
 
-  // Poll the REST telemetry snapshot on an interval. React Native's fetch
-  // doesn't expose a streaming ReadableStream body, so an SSE-style reader
-  // never receives a byte here - polling is the transport RN actually supports.
+  // Poll the REST telemetry snapshot on an interval.
   useEffect(() => {
     if (!bike?.id) return;
     let active = true;
@@ -136,24 +131,34 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
         const frame = await fetchLatestTelemetryApi(bike.id, token);
         if (!active) return;
 
+        const timeStr = new Date().toTimeString().slice(0, 8);
         const lat = frame.latitude ?? frame.lat;
         const lon = frame.longitude ?? frame.lon;
+        const speedVal = frame.speed !== undefined && frame.speed !== null ? Number(frame.speed) : null;
+        const batVal = frame.battery_percent ?? (frame as any).batteryPercent ?? (frame as any).percent;
+
         if (lat !== undefined && lon !== undefined && (Number(lat) !== 0 || Number(lon) !== 0)) {
           setLocation({ latitude: Number(lat), longitude: Number(lon) });
         }
 
-        if (frame.speed !== undefined && frame.speed !== null) setSpeed(Number(frame.speed));
+        if (speedVal !== null) setSpeed(speedVal);
 
         const batV = frame.battery_voltage ?? (frame as any).batteryVoltage ?? (frame as any).voltage;
         if (batV !== undefined && batV !== null) setBatteryVolts(Number(batV));
-
-        const batP = frame.battery_percent ?? (frame as any).batteryPercent ?? (frame as any).percent;
-        if (batP !== undefined && batP !== null) setBatteryPercent(Number(batP));
+        if (batVal !== undefined && batVal !== null) setBatteryPercent(Number(batVal));
 
         const sats = frame.sats_used ?? (frame as any).satsUsed ?? (frame as any).sats;
         if (sats !== undefined && sats !== null) setSatsUsed(Number(sats));
 
         setLastFrameAt(Date.now());
+
+        // Append live frame telemetry entry to activity log
+        const logMsg = `Frame received: ${speedVal !== null ? `${speedVal.toFixed(1)} km/h` : '0.0 km/h'}, Bat: ${batVal !== undefined ? `${batVal}%` : '--'}, Sats: ${sats ?? '--'}`;
+        setActivityLogs((prev) => {
+          // Avoid duplicate entries if last entry message is identical
+          if (prev.length > 0 && prev[0].msg === logMsg) return prev;
+          return [{ ts: timeStr, msg: logMsg }, ...prev.slice(0, 49)];
+        });
       } catch (err) {
         if (active) setLastErrorAt(Date.now());
       } finally {
@@ -454,16 +459,20 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
 
         {/* Activity Logs Accordion */}
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>ACTIVITY LOGS</Text>
+          <Text style={styles.sectionTitle}>LIVE ACTIVITY LOGS</Text>
           <View style={styles.logsContainer}>
-            {activityLogs.map((log, idx) => (
-              <View key={idx} style={styles.logRow}>
-                <Text style={styles.logTime}>{log.ts}</Text>
-                <Text style={[styles.logMsg, log.highlight && styles.logHighlight]}>
-                  {log.msg}
-                </Text>
-              </View>
-            ))}
+            {activityLogs.length === 0 ? (
+              <Text style={styles.cardSubtext}>📡 Listening for live telemetry frames & system events...</Text>
+            ) : (
+              activityLogs.map((log, idx) => (
+                <View key={idx} style={styles.logRow}>
+                  <Text style={styles.logTime}>{log.ts}</Text>
+                  <Text style={[styles.logMsg, log.highlight && styles.logHighlight]}>
+                    {log.msg}
+                  </Text>
+                </View>
+              ))
+            )}
           </View>
         </View>
 
