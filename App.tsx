@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
-import { StyleSheet, View, Platform, StatusBar } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Platform, StatusBar } from 'react-native';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { RegisterScreen } from './src/screens/RegisterScreen';
 import { ClaimScreen } from './src/screens/ClaimScreen';
 import { MapDashboardScreen } from './src/screens/MapDashboardScreen';
+import { GarageScreen } from './src/screens/GarageScreen';
+import { AccountScreen } from './src/screens/AccountScreen';
 import { SplashScreen } from './src/screens/SplashScreen';
 import { HelpScreen } from './src/screens/HelpScreen';
 import {
@@ -22,7 +24,8 @@ export default function App() {
   const [authToken, setAuthTokenState] = useState<string | null>(null);
   const [user, setUser] = useState<any | null>(null);
   const [pairedBike, setPairedBikeState] = useState<any | null>(null);
-  const [screen, setScreen] = useState<'main' | 'register' | 'help'>('main');
+  const [screen, setScreen] = useState<'main' | 'register' | 'help' | 'claim_new'>('main');
+  const [activeTab, setActiveTab] = useState<'security' | 'garage' | 'account'>('security');
 
   useEffect(() => {
     Promise.all([getAuthToken(), getPairedBike()])
@@ -125,11 +128,68 @@ export default function App() {
     );
   }
 
+  if (screen === 'claim_new') {
+    return (
+      <View style={styles.container}>
+        <ExpoStatusBar style="light" translucent backgroundColor="#131314" />
+        <ClaimScreen
+          authToken={authToken}
+          onClaimSuccess={(bikeData) => {
+            handleClaimSuccess(bikeData);
+            setScreen('main');
+          }}
+          onLogout={handleLogout}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <ExpoStatusBar style="light" translucent backgroundColor="#131314" />
       {pairedBike ? (
-        <MapDashboardScreen bike={pairedBike} onUnpair={handleUnpair} onLogout={handleLogout} />
+        <View style={{ flex: 1 }}>
+          <View style={{ flex: 1 }}>
+            {activeTab === 'garage' ? (
+              <GarageScreen
+                bike={pairedBike}
+                onUnpair={handleUnpair}
+                onNavigateClaimNew={() => setScreen('claim_new')}
+              />
+            ) : activeTab === 'account' ? (
+              <AccountScreen
+                onLogout={handleLogout}
+                onNavigateHelp={() => setScreen('help')}
+              />
+            ) : (
+              <MapDashboardScreen
+                bike={pairedBike}
+                onUnpair={handleUnpair}
+                onLogout={handleLogout}
+                activeTab={activeTab}
+                onSelectTab={setActiveTab}
+              />
+            )}
+          </View>
+          <View style={styles.bottomNav}>
+            <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('security')}>
+              <Text style={styles.navIcon}>🏠</Text>
+              <Text style={[styles.navLabel, activeTab === 'security' && styles.navLabelActive]}>HOME</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('security')}>
+              <Text style={styles.navIcon}>🛡️</Text>
+              <Text style={[styles.navLabel, activeTab === 'security' && styles.navLabelActive]}>SECURITY</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('garage')}>
+              <Text style={styles.navIcon}>🚲</Text>
+              <Text style={[styles.navLabel, activeTab === 'garage' && styles.navLabelActive]}>GARAGE</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('account')}>
+              <Text style={styles.navIcon}>👤</Text>
+              <Text style={[styles.navLabel, activeTab === 'account' && styles.navLabelActive]}>ACCOUNT</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       ) : (
         <ClaimScreen authToken={authToken} onClaimSuccess={handleClaimSuccess} onLogout={handleLogout} />
       )}
@@ -142,5 +202,33 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#131314',
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
+  },
+  bottomNav: {
+    flexDirection: 'row',
+    backgroundColor: '#1C1B1C',
+    borderTopWidth: 1,
+    borderTopColor: '#363435',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  navItem: {
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  },
+  navIcon: {
+    fontSize: 18,
+    marginBottom: 2,
+  },
+  navLabel: {
+    color: '#8E9192',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  navLabelActive: {
+    color: '#FFEA00',
   },
 });

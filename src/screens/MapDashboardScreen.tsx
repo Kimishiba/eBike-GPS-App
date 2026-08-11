@@ -35,6 +35,8 @@ interface MapDashboardScreenProps {
   bike: any;
   onUnpair: () => void;
   onLogout: () => void;
+  activeTab: 'security' | 'garage' | 'account';
+  onSelectTab: (tab: 'security' | 'garage' | 'account') => void;
 }
 
 const TELEMETRY_POLL_INTERVAL_MS = 5000;
@@ -66,7 +68,13 @@ function formatLastUpdate(lastFrameAt: number | null, now: number): string {
   return `Last update: ${hours}h ago`;
 }
 
-export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, onUnpair, onLogout }) => {
+export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
+  bike,
+  onUnpair,
+  onLogout,
+  activeTab,
+  onSelectTab,
+}) => {
   // Telemetry State
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [speed, setSpeed] = useState<number | null>(null);
@@ -77,7 +85,6 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
   const [motorCutEnabled, setMotorCutEnabled] = useState<boolean>(false);
   const [reportingIntervalSecs, setReportingIntervalSecs] = useState<number>(60);
   const [commandStatus, setCommandStatus] = useState<string>('Uplink Active');
-  const [activeTab, setActiveTab] = useState<'security' | 'garage' | 'account'>('security');
 
   // Logs for Activity Log accordion
   const [activityLogs, setActivityLogs] = useState<Array<{ ts: string; msg: string; highlight?: boolean }>>([
@@ -472,21 +479,21 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
 
       {/* Stitch Tactical Bottom Nav Bar */}
       <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('security')}>
+        <TouchableOpacity style={styles.navItem} onPress={() => onSelectTab('security')}>
           <Text style={styles.navIcon}>🏠</Text>
-          <Text style={styles.navLabel}>HOME</Text>
+          <Text style={[styles.navLabel, activeTab === 'security' && styles.navLabelActive]}>HOME</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('security')}>
+        <TouchableOpacity style={styles.navItem} onPress={() => onSelectTab('security')}>
           <Text style={styles.navIcon}>🛡️</Text>
-          <Text style={[styles.navLabel, styles.navLabelActive]}>SECURITY</Text>
+          <Text style={[styles.navLabel, activeTab === 'security' && styles.navLabelActive]}>SECURITY</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('garage')}>
+        <TouchableOpacity style={styles.navItem} onPress={() => onSelectTab('garage')}>
           <Text style={styles.navIcon}>🚲</Text>
-          <Text style={styles.navLabel}>GARAGE</Text>
+          <Text style={[styles.navLabel, activeTab === 'garage' && styles.navLabelActive]}>GARAGE</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={() => setActiveTab('account')}>
+        <TouchableOpacity style={styles.navItem} onPress={() => onSelectTab('account')}>
           <Text style={styles.navIcon}>👤</Text>
-          <Text style={styles.navLabel}>ACCOUNT</Text>
+          <Text style={[styles.navLabel, activeTab === 'account' && styles.navLabelActive]}>ACCOUNT</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
