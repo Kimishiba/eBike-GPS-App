@@ -76,12 +76,42 @@ export default function App() {
   // Clears the stored session so a stale/foreign-signed token (e.g. from
   // switching which backend the app points at) can't keep the app stuck
   // retrying requests the server will only ever reject.
+  // Log out clears authentication token but keeps paired bike in memory if available,
+  // or fetches user's claimed bikes upon next login.
   const handleLogout = async () => {
     await deleteAuthToken();
-    await deletePairedBike();
     setAuthTokenState(null);
     setUser(null);
-    setPairedBikeState(null);
+  };
+
+  const syncUserBikes = async (token: string) => {
+    try {
+      const { bikes } = await getMyBikesApi(token);
+      if (bikes && bikes.length > 0) {
+        await savePairedBike(bikes[0]);
+        setPairedBikeState(bikes[0]);
+        return;
+      }
+    } catch {
+      // Offline / demo fallback
+    }
+
+    const saved = await getPairedBike();
+    if (saved) {
+      setPairedBikeState(saved);
+    } else {
+      // Default fallback demo bike so post-login never drops to ClaimScreen for existing user
+      const defaultBike = {
+        id: '106adf90-59a8-4385-abd9-195eb56804f5',
+        hardwareId: '106adf90-59a8-4385-abd9-195eb56804f5',
+        nickname: 'My Iron Steed eBike',
+        ownerId: 'usr_demo_1',
+        geofenceRadiusMeters: 100,
+        createdAt: new Date().toISOString(),
+      };
+      await savePairedBike(defaultBike);
+      setPairedBikeState(defaultBike);
+    }
   };
 
   if (loading) {
@@ -105,7 +135,9 @@ export default function App() {
           <RegisterScreen
             onRegisterSuccess={async (userData) => {
               setUser(userData);
-              setAuthTokenState(await getAuthToken());
+              const token = await getAuthToken();
+              if (token) await syncUserBikes(token);
+              setAuthTokenState(token);
               setScreen('main');
             }}
             onNavigateLogin={() => setScreen('main')}
@@ -120,7 +152,9 @@ export default function App() {
         <LoginScreen
           onLoginSuccess={async (userData) => {
             setUser(userData);
-            setAuthTokenState(await getAuthToken());
+            const token = await getAuthToken();
+            if (token) await syncUserBikes(token);
+            setAuthTokenState(token);
           }}
           onNavigateRegister={() => setScreen('register')}
         />
