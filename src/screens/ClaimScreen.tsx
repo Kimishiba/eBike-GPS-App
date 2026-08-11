@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StatusBar,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { claimBoardApi } from '../services/api';
@@ -28,6 +29,7 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ authToken, onClaimSucc
   const [manualMode, setManualMode] = useState<boolean>(false);
 
   // Form State
+  const [hardwareId, setHardwareId] = useState<string>('');
   const [claimCode, setClaimCode] = useState<string>('');
   const [nickname, setNickname] = useState<string>('My eBike');
   const [geofenceRadius, setGeofenceRadius] = useState<number>(100);
@@ -50,25 +52,29 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ authToken, onClaimSucc
 
     try {
       if (rawData.startsWith('ebike://claim')) {
+        const idMatch = rawData.match(/[?&]id=([^&]+)/);
         const codeMatch = rawData.match(/[?&]code=([^&]+)/);
+
+        const foundId = idMatch && idMatch[1] ? idMatch[1] : '';
         const foundCode = codeMatch && codeMatch[1] ? codeMatch[1] : '';
 
         if (foundCode) {
+          if (foundId) setHardwareId(foundId);
           setClaimCode(foundCode.toUpperCase());
           setStep(2);
           return;
         }
       }
 
-      // Direct fallback parsing for query params or raw text
       if (rawData.includes('code=')) {
         const matchCode = rawData.match(/code=([A-Za-z0-9_-]+)/i);
+        const matchId = rawData.match(/id=([a-f0-9-]{36})/i);
         if (matchCode && matchCode[1]) setClaimCode(matchCode[1].toUpperCase());
+        if (matchId && matchId[1]) setHardwareId(matchId[1]);
         setStep(2);
         return;
       }
 
-      // Raw text code fallback
       if (rawData.trim().length >= 3) {
         setClaimCode(rawData.trim().toUpperCase());
         setStep(2);
@@ -115,7 +121,7 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ authToken, onClaimSucc
 
       Alert.alert('🎉 Board Paired!', `Successfully paired "${response.bike.nickname}" to your account.`, [
         {
-          text: 'Open Map Dashboard',
+          text: 'Open Dashboard',
           onPress: () => onClaimSuccess(bikeWithoutSecret),
         },
       ]);
@@ -130,105 +136,101 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ authToken, onClaimSucc
     return <View style={styles.container} />;
   }
 
-  if (!permission.granted && step === 1 && !manualMode) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.permissionBox}>
-          <Text style={styles.headerTitle}>Camera Permission Required</Text>
-          <Text style={styles.permissionText}>
-            We need camera access to scan the QR code printed on your tracker packaging.
-          </Text>
-          <TouchableOpacity style={styles.primaryBtn} onPress={requestPermission}>
-            <Text style={styles.btnText}>Grant Camera Permission</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => setManualMode(true)}>
-            <Text style={styles.secondaryBtnText}>Enter Code Manually</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#131314" />
+
+      {/* Header Bar */}
+      <View style={styles.header}>
+        <View style={styles.headerRow}>
+          <View style={styles.brandRow}>
+            <Text style={styles.brandIcon}>🛡️</Text>
+            <Text style={styles.brandTitle}>IRON STEED</Text>
+          </View>
+          <TouchableOpacity onPress={onLogout}>
+            <Text style={styles.logoutLink}>LOG OUT</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.headerSubtitle}>
+          {step === 1 ? 'PAIRS & CLAIMS A NEW TRACKER BOARD' : 'SETUP EBIKE PROFILE & SAFE ZONE'}
+        </Text>
+      </View>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <View style={styles.header}>
-          <View style={styles.headerRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle}>
-                {step === 1 ? 'Step 1: Pair Your Board' : 'Step 2: Customise eBike Profile'}
-              </Text>
-              <Text style={styles.headerSubtitle}>
-                {step === 1
-                  ? 'Scan the QR code on your board packaging to claim Ownership.'
-                  : 'Set a nickname and home safe-zone geofence for your eBike.'}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={onLogout}>
-              <Text style={styles.logoutLink}>Log Out</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        {step === 1 ? (
+          <View style={{ flex: 1 }}>
+            {!manualMode ? (
+              <View style={styles.cameraWrapper}>
+                {!permission.granted ? (
+                  <View style={styles.permissionBox}>
+                    <Text style={styles.permissionText}>
+                      Camera permission is required to scan the hardware QR code sticker.
+                    </Text>
+                    <TouchableOpacity style={styles.primaryBtn} onPress={requestPermission}>
+                      <Text style={styles.btnText}>GRANT CAMERA PERMISSION</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <CameraView
+                    style={styles.camera}
+                    facing="back"
+                    onBarcodeScanned={handleBarcodeScanned}
+                  >
+                    <View style={styles.overlayContainer}>
+                      <View style={styles.scanFrame} />
+                      <Text style={styles.scanHint}>ALIGN STICKER QR INSIDE FRAME</Text>
+                    </View>
+                  </CameraView>
+                )}
 
-        {step === 1 && !manualMode && (
-          <View style={styles.cameraWrapper}>
-            <CameraView
-              style={styles.camera}
-              facing="back"
-              barcodeScannerSettings={{
-                barcodeTypes: ['qr'],
-              }}
-              onBarcodeScanned={handleBarcodeScanned}
-            >
-              <View style={styles.overlayContainer}>
-                <View style={styles.scanFrame} />
-                <Text style={styles.scanHint}>Align QR code within the frame</Text>
+                <TouchableOpacity
+                  style={styles.manualSwitchBtn}
+                  onPress={() => setManualMode(true)}
+                >
+                  <Text style={styles.manualSwitchText}>ENTER CODE MANUALLY</Text>
+                </TouchableOpacity>
               </View>
-            </CameraView>
-            <TouchableOpacity style={styles.manualSwitchBtn} onPress={() => setManualMode(true)}>
-              <Text style={styles.manualSwitchText}>⌨️ Enter Claim Code Manually</Text>
-            </TouchableOpacity>
+            ) : (
+              <ScrollView contentContainerStyle={styles.formContainer}>
+                <Text style={styles.label}>FACTORY CLAIM CODE</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. K9X2-M7PQ"
+                  placeholderTextColor="#8E9192"
+                  value={claimCode}
+                  onChangeText={setClaimCode}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+
+                <TouchableOpacity style={styles.primaryBtn} onPress={handleManualNext}>
+                  <Text style={styles.btnText}>CONTINUE TO SETUP</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.secondaryBtn}
+                  onPress={() => setManualMode(false)}
+                >
+                  <Text style={styles.secondaryBtnText}>SWITCH BACK TO CAMERA SCANNER</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            )}
           </View>
-        )}
-
-        {(step === 1 && manualMode) && (
+        ) : (
           <ScrollView contentContainerStyle={styles.formContainer}>
-            <Text style={styles.label}>Claim Code</Text>
+            <Text style={styles.label}>EBIKE NICKNAME</Text>
             <TextInput
               style={styles.input}
-              placeholder="e.g. EBIKE2026TEST"
-              placeholderTextColor="#666"
-              value={claimCode}
-              onChangeText={(val) => setClaimCode(val.toUpperCase())}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-
-            <TouchableOpacity style={styles.primaryBtn} onPress={handleManualNext}>
-              <Text style={styles.btnText}>Next Step →</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.secondaryBtn} onPress={() => setManualMode(false)}>
-              <Text style={styles.secondaryBtnText}>📷 Switch to Camera Scanner</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        )}
-
-        {step === 2 && (
-          <ScrollView contentContainerStyle={styles.formContainer}>
-            <Text style={styles.label}>eBike Nickname</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Specialized Turbo Vado"
-              placeholderTextColor="#666"
+              placeholder="e.g. Stealth Cruiser"
+              placeholderTextColor="#8E9192"
               value={nickname}
               onChangeText={setNickname}
             />
 
-            <Text style={styles.label}>Home Safe Zone Geofence ({geofenceRadius} meters)</Text>
+            <Text style={styles.label}>DEFAULT SAFE ZONE GEOFENCE</Text>
             <View style={styles.geofenceRow}>
               {[50, 100, 250, 500].map((radius) => (
                 <TouchableOpacity
@@ -252,8 +254,12 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ authToken, onClaimSucc
             </View>
 
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryTitle}>Board Summary</Text>
-              <Text style={styles.summaryItem}>• Claim Token: {claimCode}</Text>
+              <Text style={styles.summaryTitle}>PAIRING SUMMARY</Text>
+              <Text style={styles.summaryItem}>Claim Code: {claimCode}</Text>
+              {hardwareId ? (
+                <Text style={styles.summaryItem}>Hardware ID: {hardwareId.slice(0, 18)}...</Text>
+              ) : null}
+              <Text style={styles.summaryItem}>Safe Geofence Radius: {geofenceRadius} meters</Text>
             </View>
 
             <TouchableOpacity
@@ -262,14 +268,18 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ authToken, onClaimSucc
               disabled={isSubmitting}
             >
               {isSubmitting ? (
-                <ActivityIndicator color="#FFF" />
+                <ActivityIndicator color="#131314" />
               ) : (
-                <Text style={styles.btnText}>Confirm & Pair Board 🚲</Text>
+                <Text style={styles.btnText}>CLAIM & PAIR EBIKE BOARD</Text>
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.secondaryBtn} onPress={() => setStep(1)}>
-              <Text style={styles.secondaryBtnText}>← Back to Scan</Text>
+            <TouchableOpacity
+              style={styles.secondaryBtn}
+              onPress={() => setStep(1)}
+              disabled={isSubmitting}
+            >
+              <Text style={styles.secondaryBtnText}>BACK TO SCANNER</Text>
             </TouchableOpacity>
           </ScrollView>
         )}
@@ -281,32 +291,45 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ authToken, onClaimSucc
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#131314',
   },
   header: {
-    padding: 20,
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#1E293B',
+    borderBottomColor: '#363435',
+    backgroundColor: '#131314',
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   logoutLink: {
-    color: '#64748B',
-    fontSize: 13,
-    fontWeight: '600',
-    paddingLeft: 12,
-  },
-  headerTitle: {
-    fontSize: 22,
+    color: '#8E9192',
+    fontSize: 10,
     fontWeight: '700',
-    color: '#F8FAFC',
-    marginBottom: 6,
+    letterSpacing: 1,
+  },
+  brandIcon: {
+    fontSize: 18,
+    marginRight: 6,
+  },
+  brandTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFEA00',
+    letterSpacing: 1.5,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#94A3B8',
+    fontSize: 10,
+    color: '#8E9192',
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   permissionBox: {
     flex: 1,
@@ -314,10 +337,10 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   permissionText: {
-    fontSize: 15,
-    color: '#CBD5E1',
+    fontSize: 13,
+    color: '#E2E2E2',
     marginVertical: 16,
-    lineHeight: 22,
+    lineHeight: 20,
   },
   cameraWrapper: {
     flex: 1,
@@ -330,106 +353,111 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    backgroundColor: 'rgba(19, 19, 20, 0.5)',
   },
   scanFrame: {
     width: 250,
     height: 250,
     borderWidth: 2,
-    borderColor: '#38BDF8',
-    borderRadius: 16,
+    borderColor: '#FFEA00',
+    borderRadius: 6,
     backgroundColor: 'transparent',
   },
   scanHint: {
     marginTop: 20,
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#FFEA00',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   manualSwitchBtn: {
     position: 'absolute',
     bottom: 30,
     alignSelf: 'center',
-    backgroundColor: '#1E293B',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 30,
+    backgroundColor: '#1C1B1C',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#FFEA00',
   },
   manualSwitchText: {
-    color: '#F8FAFC',
-    fontSize: 15,
-    fontWeight: '600',
+    color: '#FFEA00',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   formContainer: {
-    padding: 24,
+    padding: 20,
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFEA00',
+    letterSpacing: 1.5,
     marginBottom: 8,
     marginTop: 16,
   },
   input: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#1C1B1C',
     borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#F8FAFC',
+    borderColor: '#363435',
+    borderRadius: 4,
+    padding: 14,
+    fontSize: 14,
+    color: '#E2E2E2',
   },
   geofenceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginVertical: 8,
+    gap: 6,
   },
   radiusChip: {
     flex: 1,
-    backgroundColor: '#1E293B',
-    paddingVertical: 12,
-    marginHorizontal: 4,
-    borderRadius: 10,
+    backgroundColor: '#2B292A',
+    paddingVertical: 10,
+    borderRadius: 4,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#363435',
   },
   radiusChipActive: {
-    backgroundColor: '#0284C7',
-    borderColor: '#38BDF8',
+    backgroundColor: 'rgba(255, 234, 0, 0.15)',
+    borderColor: '#FFEA00',
   },
   radiusChipText: {
-    color: '#94A3B8',
-    fontWeight: '600',
+    color: '#8E9192',
+    fontSize: 11,
+    fontWeight: '700',
   },
   radiusChipTextActive: {
-    color: '#FFF',
+    color: '#FFEA00',
   },
   summaryCard: {
-    backgroundColor: '#1E293B',
-    padding: 16,
-    borderRadius: 12,
-    marginVertical: 20,
+    backgroundColor: '#1C1B1C',
+    padding: 14,
+    borderRadius: 4,
+    marginVertical: 16,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#363435',
   },
   summaryTitle: {
-    fontSize: 14,
+    fontSize: 10,
     fontWeight: '700',
-    color: '#38BDF8',
+    color: '#FFEA00',
+    letterSpacing: 1.5,
     marginBottom: 8,
   },
   summaryItem: {
-    fontSize: 13,
-    color: '#CBD5E1',
+    fontSize: 12,
+    color: '#8E9192',
     marginVertical: 2,
   },
   primaryBtn: {
-    backgroundColor: '#0284C7',
-    paddingVertical: 16,
-    borderRadius: 12,
+    backgroundColor: '#FFEA00',
+    paddingVertical: 14,
+    borderRadius: 4,
     alignItems: 'center',
     marginTop: 10,
   },
@@ -437,18 +465,20 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   btnText: {
-    color: '#FFF',
-    fontSize: 16,
+    color: '#131314',
+    fontSize: 12,
     fontWeight: '700',
+    letterSpacing: 1.5,
   },
   secondaryBtn: {
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 10,
   },
   secondaryBtnText: {
-    color: '#94A3B8',
-    fontSize: 14,
-    fontWeight: '600',
+    color: '#8E9192',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
 });

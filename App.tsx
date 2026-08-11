@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
-import { StyleSheet, View, ActivityIndicator, Platform, StatusBar } from 'react-native';
+import { StyleSheet, View, Platform, StatusBar } from 'react-native';
 import { LoginScreen } from './src/screens/LoginScreen';
+import { RegisterScreen } from './src/screens/RegisterScreen';
 import { ClaimScreen } from './src/screens/ClaimScreen';
 import { MapDashboardScreen } from './src/screens/MapDashboardScreen';
+import { SplashScreen } from './src/screens/SplashScreen';
+import { HelpScreen } from './src/screens/HelpScreen';
 import {
   getAuthToken,
   getPairedBike,
@@ -14,13 +17,14 @@ import {
 import { getMyBikesApi } from './src/services/api';
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(true);
   const [authToken, setAuthTokenState] = useState<string | null>(null);
   const [user, setUser] = useState<any | null>(null);
   const [pairedBike, setPairedBikeState] = useState<any | null>(null);
+  const [screen, setScreen] = useState<'main' | 'register' | 'help'>('main');
 
   useEffect(() => {
-    // Check saved session auth token & paired bike on launch
     Promise.all([getAuthToken(), getPairedBike()])
       .then(async ([token, savedBike]) => {
         if (token) {
@@ -62,6 +66,10 @@ export default function App() {
     setPairedBikeState(null);
   };
 
+  if (showSplash) {
+    return <SplashScreen onFinish={() => setShowSplash(false)} />;
+  }
+
   // Clears the stored session so a stale/foreign-signed token (e.g. from
   // switching which backend the app points at) can't keep the app stuck
   // retrying requests the server will only ever reject.
@@ -74,32 +82,52 @@ export default function App() {
   };
 
   if (loading) {
+    return <SplashScreen onFinish={() => {}} />;
+  }
+
+  if (screen === 'help') {
     return (
-      <View style={[styles.container, styles.loadingCenter]}>
-        <ActivityIndicator size="large" color="#38BDF8" />
+      <View style={styles.container}>
+        <ExpoStatusBar style="light" translucent backgroundColor="#131314" />
+        <HelpScreen onBack={() => setScreen('main')} />
       </View>
     );
   }
 
-  // Step 1: Unauthenticated ➔ LoginScreen
   if (!authToken) {
+    if (screen === 'register') {
+      return (
+        <View style={styles.container}>
+          <ExpoStatusBar style="light" translucent backgroundColor="#131314" />
+          <RegisterScreen
+            onRegisterSuccess={async (userData) => {
+              setUser(userData);
+              setAuthTokenState(await getAuthToken());
+              setScreen('main');
+            }}
+            onNavigateLogin={() => setScreen('main')}
+          />
+        </View>
+      );
+    }
+
     return (
       <View style={styles.container}>
-        <ExpoStatusBar style="light" translucent backgroundColor="#0F172A" />
+        <ExpoStatusBar style="light" translucent backgroundColor="#131314" />
         <LoginScreen
-          onLoginSuccess={(token, userData) => {
-            setAuthTokenState(token);
+          onLoginSuccess={async (userData) => {
             setUser(userData);
+            setAuthTokenState(await getAuthToken());
           }}
+          onNavigateRegister={() => setScreen('register')}
         />
       </View>
     );
   }
 
-  // Step 2: Authenticated ➔ MapDashboardScreen (if paired) OR ClaimScreen (if unclaimed)
   return (
     <View style={styles.container}>
-      <ExpoStatusBar style="light" translucent backgroundColor="#0F172A" />
+      <ExpoStatusBar style="light" translucent backgroundColor="#131314" />
       {pairedBike ? (
         <MapDashboardScreen bike={pairedBike} onUnpair={handleUnpair} onLogout={handleLogout} />
       ) : (
@@ -112,11 +140,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#131314',
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
-  },
-  loadingCenter: {
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });
