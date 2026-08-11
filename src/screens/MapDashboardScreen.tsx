@@ -41,6 +41,17 @@ const CONNECTION_BADGE_COLORS: Record<ConnectionState, { bg: string; fg: string 
   CONNECTING: { bg: 'rgba(148, 163, 184, 0.15)', fg: '#94A3B8' },
 };
 
+function formatLastUpdate(lastFrameAt: number | null, now: number): string {
+  if (lastFrameAt === null) return 'Last update: never';
+  const seconds = Math.floor((now - lastFrameAt) / 1000);
+  if (seconds < 5) return 'Last update: just now';
+  if (seconds < 60) return `Last update: ${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `Last update: ${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `Last update: ${hours}h ago`;
+}
+
 export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, onUnpair, onLogout }) => {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [speed, setSpeed] = useState<number | null>(null);
@@ -235,6 +246,7 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
             </View>
             <Text style={styles.firmwareBadge}>v1.0.0</Text>
           </View>
+          <Text style={styles.lastUpdateText}>{formatLastUpdate(lastFrameAt, nowTick)}</Text>
         </View>
 
         <View style={{ alignItems: 'flex-end' }}>
@@ -446,6 +458,11 @@ const styles = StyleSheet.create({
   firmwareBadge: {
     color: '#94A3B8',
     fontSize: 11,
+  },
+  lastUpdateText: {
+    color: '#64748B',
+    fontSize: 10,
+    marginTop: 4,
   },
   armBtn: {
     paddingHorizontal: 16,
