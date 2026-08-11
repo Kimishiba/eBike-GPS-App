@@ -43,15 +43,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       await setAuthToken(res.token);
       onLoginSuccess(res.token, res.user);
     } catch (err: any) {
-      // Demo fallback mode for offline/local testing
-      if (err.message.includes('Network request failed') || err.message.includes('status')) {
-        const mockToken = 'mock_jwt_token_demo_mode';
-        const mockUser = { id: 'usr_demo_1', email, name: name || 'Demo User' };
-        await setAuthToken(mockToken);
-        onLoginSuccess(mockToken, mockUser);
-      } else {
-        Alert.alert('Authentication Failed', err.message || 'Unable to authenticate.');
-      }
+      Alert.alert('Authentication Failed', err.message || 'Unable to authenticate.');
     } finally {
       setLoading(false);
     }

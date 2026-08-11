@@ -19,9 +19,10 @@ import { subscribeTelemetryApi, sendIntervalCommandApi } from '../services/api';
 interface MapDashboardScreenProps {
   bike: any;
   onUnpair: () => void;
+  onLogout: () => void;
 }
 
-export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, onUnpair }) => {
+export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, onUnpair, onLogout }) => {
   // Telemetry Live/SSE State (Default fallback to GPS lock 45.502274, 12.611452)
   const [location, setLocation] = useState({
     latitude: 45.502274,
@@ -357,6 +358,10 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
           <TouchableOpacity style={styles.unpairBtn} onPress={onUnpair}>
             <Text style={styles.unpairBtnText}>Unpair Board from Account</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
+            <Text style={styles.logoutBtnText}>Log Out</Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -544,6 +549,15 @@ const styles = StyleSheet.create({
   },
   unpairBtnText: {
     color: '#EF4444',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  logoutBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  logoutBtnText: {
+    color: '#64748B',
     fontSize: 13,
     fontWeight: '600',
   },

@@ -17,16 +17,17 @@ import { claimBoardApi } from '../services/api';
 import { setDeviceSecret } from '../services/secureStorage';
 
 interface ClaimScreenProps {
+  authToken: string | null;
   onClaimSuccess: (bikeData: any) => void;
+  onLogout: () => void;
 }
 
-export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
+export const ClaimScreen: React.FC<ClaimScreenProps> = ({ authToken, onClaimSuccess, onLogout }) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [step, setStep] = useState<1 | 2>(1);
   const [manualMode, setManualMode] = useState<boolean>(false);
 
   // Form State
-  const [hardwareId, setHardwareId] = useState<string>('');
   const [claimCode, setClaimCode] = useState<string>('');
   const [nickname, setNickname] = useState<string>('My eBike');
   const [geofenceRadius, setGeofenceRadius] = useState<number>(100);
@@ -49,14 +50,10 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
 
     try {
       if (rawData.startsWith('ebike://claim')) {
-        const idMatch = rawData.match(/[?&]id=([^&]+)/);
         const codeMatch = rawData.match(/[?&]code=([^&]+)/);
-
-        const foundId = idMatch && idMatch[1] ? idMatch[1] : '';
         const foundCode = codeMatch && codeMatch[1] ? codeMatch[1] : '';
 
         if (foundCode) {
-          if (foundId) setHardwareId(foundId);
           setClaimCode(foundCode.toUpperCase());
           setStep(2);
           return;
@@ -66,9 +63,7 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
       // Direct fallback parsing for query params or raw text
       if (rawData.includes('code=')) {
         const matchCode = rawData.match(/code=([A-Za-z0-9_-]+)/i);
-        const matchId = rawData.match(/id=([a-f0-9-]{36})/i);
         if (matchCode && matchCode[1]) setClaimCode(matchCode[1].toUpperCase());
-        if (matchId && matchId[1]) setHardwareId(matchId[1]);
         setStep(2);
         return;
       }
@@ -104,12 +99,14 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
 
     setIsSubmitting(true);
     try {
-      const response = await claimBoardApi({
-        hardwareId: hardwareId || '71d0dad7-1afa-4328-9931-c7b07ee28238',
-        claimCode,
-        nickname: nickname.trim(),
-        geofenceRadiusMeters: geofenceRadius,
-      });
+      const response = await claimBoardApi(
+        {
+          claimCode,
+          nickname: nickname.trim(),
+          geofenceRadiusMeters: geofenceRadius,
+        },
+        authToken
+      );
 
       const { deviceSecret, ...bikeWithoutSecret } = response.bike;
       if (deviceSecret) {
@@ -123,22 +120,7 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
         },
       ]);
     } catch (error: any) {
-      // Demo fallback if backend API endpoint is unreachable
-      const mockBike = {
-        id: 'bike_demo_1',
-        hardwareId: hardwareId || '71d0dad7-1afa-4328-9931-c7b07ee28238',
-        nickname: nickname.trim(),
-        ownerId: 'usr_demo_1',
-        geofenceRadiusMeters: geofenceRadius,
-        createdAt: new Date().toISOString(),
-      };
-
-      Alert.alert('🎉 Board Paired (Demo)!', `Successfully paired "${mockBike.nickname}".`, [
-        {
-          text: 'Open Map Dashboard',
-          onPress: () => onClaimSuccess(mockBike),
-        },
-      ]);
+      Alert.alert('Pairing Failed', error?.message || 'Unable to claim this board. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -174,14 +156,21 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
         style={{ flex: 1 }}
       >
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            {step === 1 ? 'Step 1: Pair Your Board' : 'Step 2: Customise eBike Profile'}
-          </Text>
-          <Text style={styles.headerSubtitle}>
-            {step === 1
-              ? 'Scan the QR code on your board packaging to claim Ownership.'
-              : 'Set a nickname and home safe-zone geofence for your eBike.'}
-          </Text>
+          <View style={styles.headerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.headerTitle}>
+                {step === 1 ? 'Step 1: Pair Your Board' : 'Step 2: Customise eBike Profile'}
+              </Text>
+              <Text style={styles.headerSubtitle}>
+                {step === 1
+                  ? 'Scan the QR code on your board packaging to claim Ownership.'
+                  : 'Set a nickname and home safe-zone geofence for your eBike.'}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={onLogout}>
+              <Text style={styles.logoutLink}>Log Out</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {step === 1 && !manualMode && (
@@ -215,17 +204,6 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
               value={claimCode}
               onChangeText={(val) => setClaimCode(val.toUpperCase())}
               autoCapitalize="characters"
-              autoCorrect={false}
-            />
-
-            <Text style={styles.label}>Hardware UUID (Optional if on packaging)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. b2c13223-08c0-4ff7-b6de-47f9a53e5ba1"
-              placeholderTextColor="#666"
-              value={hardwareId}
-              onChangeText={setHardwareId}
-              autoCapitalize="none"
               autoCorrect={false}
             />
 
@@ -276,9 +254,6 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
             <View style={styles.summaryCard}>
               <Text style={styles.summaryTitle}>Board Summary</Text>
               <Text style={styles.summaryItem}>• Claim Token: {claimCode}</Text>
-              <Text style={styles.summaryItem}>
-                • Hardware ID: {hardwareId || 'Default Prototyping Board'}
-              </Text>
             </View>
 
             <TouchableOpacity
@@ -312,6 +287,16 @@ const styles = StyleSheet.create({
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#1E293B',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  logoutLink: {
+    color: '#64748B',
+    fontSize: 13,
+    fontWeight: '600',
+    paddingLeft: 12,
   },
   headerTitle: {
     fontSize: 22,
