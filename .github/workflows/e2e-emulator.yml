@@ -8,7 +8,7 @@ on:
 jobs:
   maestro-e2e:
     name: Run Maestro E2E Tests on Android Emulator
-    runs-on: macos-13
+    runs-on: macos-latest
 
     steps:
       - name: Checkout repository
