@@ -14,7 +14,8 @@ import * as LocalAuthentication from 'expo-local-authentication';
 
 import { BLE_AUTO_DISARM_ENABLED, useBleProximityDisarm } from '../hooks/useBleProximityDisarm';
 import { getDeviceSecret, getPairedBleDeviceId, setPairedBleDeviceId, getAuthToken } from '../services/secureStorage';
-import { subscribeTelemetryApi, sendIntervalCommandApi } from '../services/api';
+import { fetchLatestTelemetryApi, sendIntervalCommandApi } from '../services/api';
+import { ConnectionState, connectionBadgeLabel, deriveConnectionState } from '../services/connectionState';
 
 interface MapDashboardScreenProps {
   bike: any;
@@ -22,13 +23,27 @@ interface MapDashboardScreenProps {
   onLogout: () => void;
 }
 
+const TELEMETRY_POLL_INTERVAL_MS = 5000;
+
+// Wide, non-committal camera framing shown only until a real GPS fix arrives -
+// intentionally not a plausible-looking coordinate.
+const NO_FIX_REGION = {
+  latitude: 0,
+  longitude: 0,
+  latitudeDelta: 60,
+  longitudeDelta: 60,
+};
+
+const CONNECTION_BADGE_COLORS: Record<ConnectionState, { bg: string; fg: string }> = {
+  LIVE: { bg: 'rgba(16, 185, 129, 0.15)', fg: '#10B981' },
+  STALE: { bg: 'rgba(234, 179, 8, 0.15)', fg: '#EAB308' },
+  DISCONNECTED: { bg: 'rgba(239, 68, 68, 0.15)', fg: '#EF4444' },
+  CONNECTING: { bg: 'rgba(148, 163, 184, 0.15)', fg: '#94A3B8' },
+};
+
 export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, onUnpair, onLogout }) => {
-  // Telemetry Live/SSE State (Default fallback to GPS lock 45.502274, 12.611452)
-  const [location, setLocation] = useState({
-    latitude: 45.502274,
-    longitude: 12.611452,
-  });
-  const [speed, setSpeed] = useState<number>(0.0);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [speed, setSpeed] = useState<number | null>(null);
   const [batteryVolts, setBatteryVolts] = useState<number | null>(null);
   const [batteryPercent, setBatteryPercent] = useState<number | null>(null);
   const [satsUsed, setSatsUsed] = useState<number | null>(null);
@@ -37,13 +52,23 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
   const [reportingIntervalSecs, setReportingIntervalSecs] = useState<number>(60);
   const [commandStatus, setCommandStatus] = useState<string>('Waiting for Next Board Broadcast...');
 
+  const [lastFrameAt, setLastFrameAt] = useState<number | null>(null);
+  const [lastErrorAt, setLastErrorAt] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState<number>(Date.now());
+  const connectionState = deriveConnectionState(lastFrameAt, lastErrorAt, nowTick);
+
   const handleSelectInterval = async (val: number) => {
+    if (!bike?.id) {
+      setCommandStatus('⚠️ No paired board id - cannot send command');
+      return;
+    }
+
     setReportingIntervalSecs(val);
     setCommandStatus('Transmitting to Fly.io...');
 
     try {
       const token = await getAuthToken();
-      const res = await sendIntervalCommandApi(bike?.id || '106adf90-59a8-4385-abd9-195eb56804f5', val, token);
+      const res = await sendIntervalCommandApi(bike.id, val, token);
       const cmdId = res?.command_id ? ` (#${res.command_id})` : '';
       setCommandStatus(`✅ Sent to Fly.io Broker${cmdId}`);
     } catch (err: any) {
@@ -51,69 +76,54 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
     }
   };
 
-  // Poll / Stream live telemetry from Fly.io backend
+  // Poll the REST telemetry snapshot on an interval. React Native's fetch
+  // doesn't expose a streaming ReadableStream body, so an SSE-style reader
+  // never receives a byte here - polling is the transport RN actually supports.
   useEffect(() => {
+    if (!bike?.id) return;
     let active = true;
+    let inFlight = false;
 
-    const pollLiveEvents = async () => {
+    const pollOnce = async () => {
+      if (inFlight) return;
+      inFlight = true;
       try {
-        const response = await fetch('https://velo-lock-tracker.fly.dev/api/events', {
-          headers: {
-            Authorization: 'Basic ' + btoa('admin:VeloDashAdmin2026!'),
-          },
-        });
+        const token = await getAuthToken();
+        const frame = await fetchLatestTelemetryApi(bike.id, token);
+        if (!active) return;
 
-        if (!response.body) return;
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-
-        while (active) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const text = decoder.decode(value, { stream: true });
-          const lines = text.split('\n');
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data && (data.battery_percent !== undefined || data.lat !== undefined)) {
-                  const lat = data.lat ?? data.latitude;
-                  const lon = data.lon ?? data.longitude;
-                  if (lat && lon && (Number(lat) !== 0 || Number(lon) !== 0)) {
-                    setLocation({
-                      latitude: Number(lat),
-                      longitude: Number(lon),
-                    });
-                  }
-
-                  const speedVal = data.speed;
-                  if (speedVal !== undefined && speedVal !== null) setSpeed(Number(speedVal));
-
-                  const batV = data.battery_voltage ?? data.batteryVoltage ?? data.voltage;
-                  if (batV !== undefined && batV !== null) setBatteryVolts(Number(batV));
-
-                  const batP = data.battery_percent ?? data.batteryPercent ?? data.percent;
-                  if (batP !== undefined && batP !== null) setBatteryPercent(Number(batP));
-
-                  const sats = data.sats_used ?? data.satsUsed ?? data.sats;
-                  if (sats !== undefined && sats !== null) setSatsUsed(Number(sats));
-                }
-              } catch (e) {
-                // Ignore chunk parse noise
-              }
-            }
-          }
+        const lat = frame.latitude ?? frame.lat;
+        const lon = frame.longitude ?? frame.lon;
+        if (lat !== undefined && lon !== undefined && (Number(lat) !== 0 || Number(lon) !== 0)) {
+          setLocation({ latitude: Number(lat), longitude: Number(lon) });
         }
+
+        if (frame.speed !== undefined && frame.speed !== null) setSpeed(Number(frame.speed));
+
+        const batV = frame.battery_voltage ?? (frame as any).batteryVoltage ?? (frame as any).voltage;
+        if (batV !== undefined && batV !== null) setBatteryVolts(Number(batV));
+
+        const batP = frame.battery_percent ?? (frame as any).batteryPercent ?? (frame as any).percent;
+        if (batP !== undefined && batP !== null) setBatteryPercent(Number(batP));
+
+        const sats = frame.sats_used ?? (frame as any).satsUsed ?? (frame as any).sats;
+        if (sats !== undefined && sats !== null) setSatsUsed(Number(sats));
+
+        setLastFrameAt(Date.now());
       } catch (err) {
-        // Retry loop if connection drops
+        if (active) setLastErrorAt(Date.now());
+      } finally {
+        inFlight = false;
       }
     };
 
-    pollLiveEvents();
+    pollOnce();
+    const pollHandle = setInterval(pollOnce, TELEMETRY_POLL_INTERVAL_MS);
+    const tickHandle = setInterval(() => setNowTick(Date.now()), TELEMETRY_POLL_INTERVAL_MS);
     return () => {
       active = false;
+      clearInterval(pollHandle);
+      clearInterval(tickHandle);
     };
   }, [bike?.id]);
 
@@ -139,6 +149,14 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
 
   // Perform 2-Factor Motor Kill Confirmation
   const handleToggleMotorCut = async () => {
+    if (speed === null) {
+      Alert.alert(
+        'Speed Unknown',
+        'Cannot verify current speed - motor kill is disabled until live telemetry is received.'
+      );
+      return;
+    }
+
     if (speed >= 5.0) {
       Alert.alert(
         '⚠️ Safety Interlock Active',
@@ -172,14 +190,17 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
             style: 'destructive',
             onPress: () => {
               setMotorCutEnabled(true);
-              setCommandStatus('Delivered to Board');
+              // No backend motor-cut command channel exists yet - this only
+              // changes the app's local switch state, so say so plainly
+              // rather than claiming the board received anything.
+              setCommandStatus('⚠️ Applied locally only - no board command channel implemented yet');
             },
           },
         ]
       );
     } else {
       setMotorCutEnabled(false);
-      setCommandStatus('Applied');
+      setCommandStatus('Applied locally only - no board command channel implemented yet');
     }
   };
 
@@ -207,19 +228,26 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
         <View>
           <Text style={styles.bikeNickname}>{bike?.nickname || 'My eBike'}</Text>
           <View style={styles.badgeRow}>
-            <View style={styles.onlineBadge}>
-              <Text style={styles.onlineBadgeText}>🟢 Wi-Fi (mDNS Connected)</Text>
+            <View style={[styles.onlineBadge, { backgroundColor: CONNECTION_BADGE_COLORS[connectionState].bg }]}>
+              <Text style={[styles.onlineBadgeText, { color: CONNECTION_BADGE_COLORS[connectionState].fg }]}>
+                {connectionBadgeLabel(connectionState)}
+              </Text>
             </View>
             <Text style={styles.firmwareBadge}>v1.0.0</Text>
           </View>
         </View>
 
-        <TouchableOpacity
-          style={[styles.armBtn, alarmArmed ? styles.armBtnActive : styles.armBtnDisarmed]}
-          onPress={handleToggleArmStatus}
-        >
-          <Text style={styles.armBtnText}>{alarmArmed ? '🔒 ARMED' : '🔓 DISARMED'}</Text>
-        </TouchableOpacity>
+        <View style={{ alignItems: 'flex-end' }}>
+          <TouchableOpacity
+            style={[styles.armBtn, alarmArmed ? styles.armBtnActive : styles.armBtnDisarmed]}
+            onPress={handleToggleArmStatus}
+          >
+            <Text style={styles.armBtnText}>{alarmArmed ? '🔒 ARMED' : '🔓 DISARMED'}</Text>
+          </TouchableOpacity>
+          {!BLE_AUTO_DISARM_ENABLED && (
+            <Text style={styles.armBtnCaption}>Local state only - auto-disarm paused</Text>
+          )}
+        </View>
       </View>
 
       {/* Interactive Map View */}
@@ -227,29 +255,37 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
         <MapView
           style={styles.map}
           provider={PROVIDER_DEFAULT}
-          initialRegion={{
-            latitude: location.latitude,
-            longitude: location.longitude,
-            latitudeDelta: 0.005,
-            longitudeDelta: 0.005,
-          }}
+          region={
+            location
+              ? { latitude: location.latitude, longitude: location.longitude, latitudeDelta: 0.005, longitudeDelta: 0.005 }
+              : NO_FIX_REGION
+          }
         >
-          {/* Safe Zone Geofence Overlay Ring */}
-          <Circle
-            center={location}
-            radius={bike?.geofenceRadiusMeters || 100}
-            fillColor="rgba(56, 189, 248, 0.15)"
-            strokeColor="#38BDF8"
-            strokeWidth={2}
-          />
+          {location && (
+            <>
+              {/* Safe Zone Geofence Overlay Ring */}
+              <Circle
+                center={location}
+                radius={bike?.geofenceRadiusMeters || 100}
+                fillColor="rgba(56, 189, 248, 0.15)"
+                strokeColor="#38BDF8"
+                strokeWidth={2}
+              />
 
-          {/* Live Animated Bike Marker */}
-          <Marker coordinate={location} title={bike?.nickname || 'eBike'}>
-            <View style={styles.markerContainer}>
-              <Text style={styles.markerEmoji}>🚲</Text>
-            </View>
-          </Marker>
+              {/* Live Animated Bike Marker */}
+              <Marker coordinate={location} title={bike?.nickname || 'eBike'}>
+                <View style={styles.markerContainer}>
+                  <Text style={styles.markerEmoji}>🚲</Text>
+                </View>
+              </Marker>
+            </>
+          )}
         </MapView>
+        {!location && (
+          <View style={styles.awaitingFixOverlay}>
+            <Text style={styles.awaitingFixText}>📡 Awaiting first GPS fix…</Text>
+          </View>
+        )}
       </View>
 
       {/* Swipeable Bottom Sheet Status Panel */}
@@ -259,7 +295,7 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
           <View style={styles.metricsRow}>
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>CURRENT SPEED</Text>
-              <Text style={styles.metricValue}>{speed.toFixed(1)}</Text>
+              <Text style={styles.metricValue}>{speed !== null ? speed.toFixed(1) : '--'}</Text>
               <Text style={styles.metricUnit}>km/h</Text>
             </View>
 
@@ -341,7 +377,9 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>Remote Motor Kill Switch</Text>
                 <Text style={styles.cardSubtitle}>
-                  {speed >= 5.0
+                  {speed === null
+                    ? 'Awaiting live telemetry - speed unknown'
+                    : speed >= 5.0
                     ? `⚠️ Speed Interlock (${speed.toFixed(1)} km/h >= 5.0 km/h)`
                     : 'Requires Biometrics & Speed < 5 km/h'}
                 </Text>
@@ -425,11 +463,35 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 13,
   },
+  armBtnCaption: {
+    color: '#64748B',
+    fontSize: 9,
+    marginTop: 4,
+  },
   mapContainer: {
     flex: 1,
   },
   map: {
     flex: 1,
+  },
+  awaitingFixOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+  },
+  awaitingFixText: {
+    color: '#F8FAFC',
+    fontSize: 14,
+    fontWeight: '700',
+    backgroundColor: 'rgba(30, 41, 59, 0.9)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
   },
   markerContainer: {
     backgroundColor: '#1E293B',
