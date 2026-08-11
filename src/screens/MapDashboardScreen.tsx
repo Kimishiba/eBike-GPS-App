@@ -20,6 +20,7 @@ import { ConnectionState, connectionBadgeLabel, deriveConnectionState } from '..
 interface MapDashboardScreenProps {
   bike: any;
   onUnpair: () => void;
+  onLogout: () => void;
 }
 
 const TELEMETRY_POLL_INTERVAL_MS = 5000;
@@ -40,7 +41,7 @@ const CONNECTION_BADGE_COLORS: Record<ConnectionState, { bg: string; fg: string 
   CONNECTING: { bg: 'rgba(148, 163, 184, 0.15)', fg: '#94A3B8' },
 };
 
-export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, onUnpair }) => {
+export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, onUnpair, onLogout }) => {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [speed, setSpeed] = useState<number | null>(null);
   const [batteryVolts, setBatteryVolts] = useState<number | null>(null);
@@ -395,6 +396,10 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
           <TouchableOpacity style={styles.unpairBtn} onPress={onUnpair}>
             <Text style={styles.unpairBtnText}>Unpair Board from Account</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
+            <Text style={styles.logoutBtnText}>Log Out</Text>
+          </TouchableOpacity>
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -606,6 +611,15 @@ const styles = StyleSheet.create({
   },
   unpairBtnText: {
     color: '#EF4444',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  logoutBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  logoutBtnText: {
+    color: '#64748B',
     fontSize: 13,
     fontWeight: '600',
   },
