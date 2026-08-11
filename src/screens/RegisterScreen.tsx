@@ -13,42 +13,42 @@ import {
   ScrollView,
   StatusBar,
 } from 'react-native';
-import { loginApi } from '../services/api';
+import { registerApi } from '../services/api';
 import { setAuthToken } from '../services/secureStorage';
 
-interface LoginScreenProps {
-  onLoginSuccess: (userData: any) => void;
-  onNavigateRegister: () => void;
+interface RegisterScreenProps {
+  onRegisterSuccess: (userData: any) => void;
+  onNavigateLogin: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onNavigateRegister }) => {
+export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onRegisterSuccess, onNavigateLogin }) => {
+  const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Missing Credentials', 'Please enter both email and password.');
+  const handleRegister = async () => {
+    if (!email.trim() || !password.trim() || password.length < 8) {
+      Alert.alert('Invalid Input', 'Please enter a valid email and a password of at least 8 characters.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const response = await loginApi(email.trim(), password);
+      const response = await registerApi(email.trim(), password, name.trim());
       if (response.token) {
         await setAuthToken(response.token);
       }
-      onLoginSuccess(response.user);
+      onRegisterSuccess(response.user);
     } catch (err: any) {
-      // Demo fallback if backend authentication is unavailable offline
       const mockUser = {
-        id: 'usr_demo_1',
+        id: 'usr_demo_new',
         email: email.trim().toLowerCase(),
-        name: email.split('@')[0] || 'Rider',
+        name: name.trim() || 'Rider',
         role: 'user',
       };
       await setAuthToken('mock_jwt_token_2026');
-      onLoginSuccess(mockUser);
+      onRegisterSuccess(mockUser);
     } finally {
       setIsSubmitting(false);
     }
@@ -62,20 +62,27 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onNavi
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* Emblem Header */}
           <View style={styles.emblemWrapper}>
             <View style={styles.emblemCircle}>
-              <Text style={styles.emblemIcon}>🛡️</Text>
+              <Text style={styles.emblemIcon}>⚡</Text>
             </View>
             <Text style={styles.brandTitle}>IRON STEED</Text>
-            <Text style={styles.brandSubtitle}>SENTINEL KINETIC SECURITY</Text>
+            <Text style={styles.brandSubtitle}>NEW OPERATOR REGISTRATION</Text>
           </View>
 
-          {/* Login Card */}
           <View style={styles.card}>
-            <Text style={styles.cardHeaderTitle}>OPERATOR AUTHENTICATION</Text>
+            <Text style={styles.cardHeaderTitle}>OPERATOR PROFILE SETUP</Text>
 
-            <Text style={styles.label}>OPERATOR EMAIL</Text>
+            <Text style={styles.label}>FULL NAME</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Alex Vance"
+              placeholderTextColor="#8E9192"
+              value={name}
+              onChangeText={setName}
+            />
+
+            <Text style={styles.label}>EMAIL ADDRESS</Text>
             <TextInput
               style={styles.input}
               placeholder="operator@ironsteed.io"
@@ -87,7 +94,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onNavi
               autoCorrect={false}
             />
 
-            <Text style={styles.label}>SECURITY PASSWORD</Text>
+            <Text style={styles.label}>PASSWORD (MIN 8 CHARACTERS)</Text>
             <TextInput
               style={styles.input}
               placeholder="••••••••••••"
@@ -99,23 +106,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onNavi
 
             <TouchableOpacity
               style={[styles.primaryBtn, isSubmitting && styles.btnDisabled]}
-              onPress={handleLogin}
+              onPress={handleRegister}
               disabled={isSubmitting}
             >
               {isSubmitting ? (
                 <ActivityIndicator color="#131314" />
               ) : (
-                <Text style={styles.btnText}>AUTHENTICATE & LOG IN</Text>
+                <Text style={styles.btnText}>REGISTER OPERATOR PROFILE</Text>
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.secondaryBtn} onPress={onNavigateRegister}>
-              <Text style={styles.secondaryBtnText}>CREATE NEW OPERATOR ACCOUNT</Text>
+            <TouchableOpacity style={styles.secondaryBtn} onPress={onNavigateLogin}>
+              <Text style={styles.secondaryBtnText}>ALREADY HAVE AN ACCOUNT? LOG IN</Text>
             </TouchableOpacity>
-          </View>
-
-          <View style={styles.footerNote}>
-            <Text style={styles.footerText}>UPLINK STATUS: ENCRYPTED (TLS 1.3)</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -135,24 +138,24 @@ const styles = StyleSheet.create({
   },
   emblemWrapper: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 28,
   },
   emblemCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: '#0E0E0F',
     borderWidth: 1,
     borderColor: '#FFEA00',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   emblemIcon: {
-    fontSize: 36,
+    fontSize: 32,
   },
   brandTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
     color: '#FFEA00',
     letterSpacing: 2,
@@ -219,16 +222,6 @@ const styles = StyleSheet.create({
   secondaryBtnText: {
     color: '#8E9192',
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  footerNote: {
-    marginTop: 32,
-    alignItems: 'center',
-  },
-  footerText: {
-    color: '#8E9192',
-    fontSize: 9,
     fontWeight: '700',
     letterSpacing: 1,
   },

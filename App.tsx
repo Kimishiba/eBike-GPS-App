@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
-import { StyleSheet, View, ActivityIndicator, Platform, StatusBar } from 'react-native';
+import { StyleSheet, View, Platform, StatusBar } from 'react-native';
 import { LoginScreen } from './src/screens/LoginScreen';
+import { RegisterScreen } from './src/screens/RegisterScreen';
 import { ClaimScreen } from './src/screens/ClaimScreen';
 import { MapDashboardScreen } from './src/screens/MapDashboardScreen';
+import { SplashScreen } from './src/screens/SplashScreen';
+import { HelpScreen } from './src/screens/HelpScreen';
 import {
   getAuthToken,
   getPairedBike,
@@ -12,13 +15,14 @@ import {
 } from './src/services/secureStorage';
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(true);
   const [authToken, setAuthTokenState] = useState<string | null>(null);
   const [user, setUser] = useState<any | null>(null);
   const [pairedBike, setPairedBikeState] = useState<any | null>(null);
+  const [screen, setScreen] = useState<'main' | 'register' | 'help'>('main');
 
   useEffect(() => {
-    // Check saved session auth token & paired bike on launch
     Promise.all([getAuthToken(), getPairedBike()])
       .then(async ([token, savedBike]) => {
         if (token) {
@@ -29,7 +33,6 @@ export default function App() {
         if (savedBike) {
           setPairedBikeState(savedBike);
         } else {
-          // If board is already flashed/provisioned, set default bike profile
           const defaultBike = {
             id: '106adf90-59a8-4385-abd9-195eb56804f5',
             hardwareId: '106adf90-59a8-4385-abd9-195eb56804f5',
@@ -55,33 +58,57 @@ export default function App() {
     setPairedBikeState(null);
   };
 
+  if (showSplash) {
+    return <SplashScreen onFinish={() => setShowSplash(false)} />;
+  }
+
   if (loading) {
+    return <SplashScreen onFinish={() => {}} />;
+  }
+
+  if (screen === 'help') {
     return (
-      <View style={[styles.container, styles.loadingCenter]}>
-        <ActivityIndicator size="large" color="#38BDF8" />
+      <View style={styles.container}>
+        <ExpoStatusBar style="light" translucent backgroundColor="#131314" />
+        <HelpScreen onBack={() => setScreen('main')} />
       </View>
     );
   }
 
-  // Step 1: Unauthenticated ➔ LoginScreen
   if (!authToken) {
+    if (screen === 'register') {
+      return (
+        <View style={styles.container}>
+          <ExpoStatusBar style="light" translucent backgroundColor="#131314" />
+          <RegisterScreen
+            onRegisterSuccess={(userData) => {
+              setUser(userData);
+              setAuthTokenState('mock_jwt_token_2026');
+              setScreen('main');
+            }}
+            onNavigateLogin={() => setScreen('main')}
+          />
+        </View>
+      );
+    }
+
     return (
       <View style={styles.container}>
-        <ExpoStatusBar style="light" translucent backgroundColor="#0F172A" />
+        <ExpoStatusBar style="light" translucent backgroundColor="#131314" />
         <LoginScreen
-          onLoginSuccess={(token, userData) => {
-            setAuthTokenState(token);
+          onLoginSuccess={(userData) => {
             setUser(userData);
+            setAuthTokenState('mock_jwt_token_2026');
           }}
+          onNavigateRegister={() => setScreen('register')}
         />
       </View>
     );
   }
 
-  // Step 2: Authenticated ➔ MapDashboardScreen (if paired) OR ClaimScreen (if unclaimed)
   return (
     <View style={styles.container}>
-      <ExpoStatusBar style="light" translucent backgroundColor="#0F172A" />
+      <ExpoStatusBar style="light" translucent backgroundColor="#131314" />
       {pairedBike ? (
         <MapDashboardScreen bike={pairedBike} onUnpair={handleUnpair} />
       ) : (
@@ -94,11 +121,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#131314',
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
-  },
-  loadingCenter: {
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });
