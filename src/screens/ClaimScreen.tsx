@@ -18,10 +18,12 @@ import { claimBoardApi } from '../services/api';
 import { setDeviceSecret } from '../services/secureStorage';
 
 interface ClaimScreenProps {
+  authToken: string | null;
   onClaimSuccess: (bikeData: any) => void;
+  onLogout: () => void;
 }
 
-export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
+export const ClaimScreen: React.FC<ClaimScreenProps> = ({ authToken, onClaimSuccess, onLogout }) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [step, setStep] = useState<1 | 2>(1);
   const [manualMode, setManualMode] = useState<boolean>(false);
@@ -103,12 +105,14 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
 
     setIsSubmitting(true);
     try {
-      const response = await claimBoardApi({
-        hardwareId: hardwareId || '71d0dad7-1afa-4328-9931-c7b07ee28238',
-        claimCode,
-        nickname: nickname.trim(),
-        geofenceRadiusMeters: geofenceRadius,
-      });
+      const response = await claimBoardApi(
+        {
+          claimCode,
+          nickname: nickname.trim(),
+          geofenceRadiusMeters: geofenceRadius,
+        },
+        authToken
+      );
 
       const { deviceSecret, ...bikeWithoutSecret } = response.bike;
       if (deviceSecret) {
@@ -122,21 +126,7 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
         },
       ]);
     } catch (error: any) {
-      const mockBike = {
-        id: 'bike_demo_1',
-        hardwareId: hardwareId || '71d0dad7-1afa-4328-9931-c7b07ee28238',
-        nickname: nickname.trim(),
-        ownerId: 'usr_demo_1',
-        geofenceRadiusMeters: geofenceRadius,
-        createdAt: new Date().toISOString(),
-      };
-
-      Alert.alert('🎉 Board Paired (Demo)!', `Successfully paired "${mockBike.nickname}".`, [
-        {
-          text: 'Open Dashboard',
-          onPress: () => onClaimSuccess(mockBike),
-        },
-      ]);
+      Alert.alert('Pairing Failed', error?.message || 'Unable to claim this board. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -152,9 +142,14 @@ export const ClaimScreen: React.FC<ClaimScreenProps> = ({ onClaimSuccess }) => {
 
       {/* Header Bar */}
       <View style={styles.header}>
-        <View style={styles.brandRow}>
-          <Text style={styles.brandIcon}>🛡️</Text>
-          <Text style={styles.brandTitle}>IRON STEED</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.brandRow}>
+            <Text style={styles.brandIcon}>🛡️</Text>
+            <Text style={styles.brandTitle}>IRON STEED</Text>
+          </View>
+          <TouchableOpacity onPress={onLogout}>
+            <Text style={styles.logoutLink}>LOG OUT</Text>
+          </TouchableOpacity>
         </View>
         <Text style={styles.headerSubtitle}>
           {step === 1 ? 'PAIRS & CLAIMS A NEW TRACKER BOARD' : 'SETUP EBIKE PROFILE & SAFE ZONE'}
@@ -304,10 +299,21 @@ const styles = StyleSheet.create({
     borderBottomColor: '#363435',
     backgroundColor: '#131314',
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+  },
+  logoutLink: {
+    color: '#8E9192',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   brandIcon: {
     fontSize: 18,

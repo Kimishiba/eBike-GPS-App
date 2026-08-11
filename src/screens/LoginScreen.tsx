@@ -40,15 +40,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onNavi
       }
       onLoginSuccess(response.user);
     } catch (err: any) {
-      // Demo fallback if backend authentication is unavailable offline
-      const mockUser = {
-        id: 'usr_demo_1',
-        email: email.trim().toLowerCase(),
-        name: email.split('@')[0] || 'Rider',
-        role: 'user',
-      };
-      await setAuthToken('mock_jwt_token_2026');
-      onLoginSuccess(mockUser);
+      Alert.alert('Authentication Failed', err.message || 'Unable to authenticate.');
     } finally {
       setIsSubmitting(false);
     }

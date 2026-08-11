@@ -41,14 +41,7 @@ export const RegisterScreen: React.FC<RegisterScreenProps> = ({ onRegisterSucces
       }
       onRegisterSuccess(response.user);
     } catch (err: any) {
-      const mockUser = {
-        id: 'usr_demo_new',
-        email: email.trim().toLowerCase(),
-        name: name.trim() || 'Rider',
-        role: 'user',
-      };
-      await setAuthToken('mock_jwt_token_2026');
-      onRegisterSuccess(mockUser);
+      Alert.alert('Registration Failed', err.message || 'Unable to register.');
     } finally {
       setIsSubmitting(false);
     }

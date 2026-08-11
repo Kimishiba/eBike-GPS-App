@@ -11,7 +11,6 @@ export interface AuthResponse {
 }
 
 export interface ClaimRequest {
-  hardwareId: string;
   claimCode: string;
   nickname: string;
   geofenceRadiusMeters?: number;
@@ -95,32 +94,71 @@ export async function claimBoardApi(
   return response.json();
 }
 
-export function subscribeTelemetryApi(
-  onTelemetry: (data: any) => void,
+export interface MyBikesResponse {
+  success: boolean;
+  bikes: Array<{
+    id: string;
+    hardwareId: string;
+    nickname: string;
+    ownerId: string;
+    createdAt: string;
+  }>;
+}
+
+// Server-truth check for "does this logged-in user already own a bike" - used
+// on app launch to recover the paired-bike state from the account itself
+// instead of trusting only the local SecureStore flag, which is lost on
+// reinstall/storage-clear even though the claim already succeeded server-side.
+export async function getMyBikesApi(
+  token?: string | null,
   apiBaseUrl: string = DEFAULT_API_BASE_URL
-): () => void {
-  const credentials = btoa('admin:VeloDashAdmin2026!');
-  
-  // Connect to live Fly.io SSE stream with Basic Auth
-  const eventSource = new EventSource(`${apiBaseUrl}/api/events`, {
-    headers: { Authorization: `Basic ${credentials}` },
-  } as EventSourceInit);
+): Promise<MyBikesResponse> {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
-  const messageHandler = (event: any) => {
-    try {
-      const data = JSON.parse(event.data);
-      if (data) onTelemetry(data);
-    } catch (e) {
-      // Ignore parse errors
-    }
-  };
+  const response = await fetch(`${apiBaseUrl}/api/v1/bikes/mine`, { headers });
 
-  eventSource.addEventListener('telemetry', messageHandler);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch owned bikes: status ${response.status}`);
+  }
 
-  return () => {
-    eventSource.removeEventListener('telemetry', messageHandler);
-    eventSource.close();
-  };
+  return response.json();
+}
+
+export interface TelemetryFrame {
+  latitude?: number;
+  longitude?: number;
+  speed?: number;
+  battery_voltage?: number;
+  battery_percent?: number;
+  sats_used?: number;
+  [key: string]: any;
+}
+
+// React Native's fetch does not expose a streaming ReadableStream body, so
+// SSE/EventSource-style consumption never delivers a byte here. Poll the
+// REST snapshot endpoint instead - it's the transport RN actually supports.
+export async function fetchLatestTelemetryApi(
+  bikeId: string,
+  token?: string | null,
+  apiBaseUrl: string = DEFAULT_API_BASE_URL
+): Promise<TelemetryFrame> {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/v1/bikes/${bikeId}/telemetry/latest`, {
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Telemetry fetch failed: status ${response.status}`);
+  }
+
+  return response.json();
 }
 
 export async function sendIntervalCommandApi(
@@ -131,8 +169,10 @@ export async function sendIntervalCommandApi(
 ): Promise<any> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Authorization': 'Basic ' + btoa('admin:VeloDashAdmin2026!'),
   };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   const intervalMs = intervalSeconds * 1000;
   const payload = JSON.stringify({
