@@ -11,7 +11,6 @@ export interface AuthResponse {
 }
 
 export interface ClaimRequest {
-  hardwareId: string;
   claimCode: string;
   nickname: string;
   geofenceRadiusMeters?: number;
@@ -90,6 +89,39 @@ export async function claimBoardApi(
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ message: 'Failed to claim board' }));
     throw new Error(errorData.message || `Claim failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export interface MyBikesResponse {
+  success: boolean;
+  bikes: Array<{
+    id: string;
+    hardwareId: string;
+    nickname: string;
+    ownerId: string;
+    createdAt: string;
+  }>;
+}
+
+// Server-truth check for "does this logged-in user already own a bike" - used
+// on app launch to recover the paired-bike state from the account itself
+// instead of trusting only the local SecureStore flag, which is lost on
+// reinstall/storage-clear even though the claim already succeeded server-side.
+export async function getMyBikesApi(
+  token?: string | null,
+  apiBaseUrl: string = DEFAULT_API_BASE_URL
+): Promise<MyBikesResponse> {
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/v1/bikes/mine`, { headers });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch owned bikes: status ${response.status}`);
   }
 
   return response.json();

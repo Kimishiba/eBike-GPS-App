@@ -9,7 +9,9 @@ import {
   getPairedBike,
   setPairedBike as savePairedBike,
   deletePairedBike,
+  deleteAuthToken,
 } from './src/services/secureStorage';
+import { getMyBikesApi } from './src/services/api';
 
 export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -28,18 +30,23 @@ export default function App() {
 
         if (savedBike) {
           setPairedBikeState(savedBike);
-        } else {
-          // If board is already flashed/provisioned, set default bike profile
-          const defaultBike = {
-            id: '106adf90-59a8-4385-abd9-195eb56804f5',
-            hardwareId: '106adf90-59a8-4385-abd9-195eb56804f5',
-            nickname: 'My LilyGO eBike',
-            ownerId: 'usr_demo_1',
-            geofenceRadiusMeters: 100,
-            createdAt: new Date().toISOString(),
-          };
-          await savePairedBike(defaultBike);
-          setPairedBikeState(defaultBike);
+        } else if (token) {
+          // The local paired-bike flag only ever gets set once, when the
+          // post-claim success Alert is dismissed (ClaimScreen.tsx) - if that
+          // never happened (app closed/reinstalled first) even though the
+          // claim already succeeded server-side, this recovers it from
+          // server truth instead of sending an already-claimed user back
+          // through ClaimScreen, where their (now burned) claim code can
+          // only fail.
+          try {
+            const { bikes } = await getMyBikesApi(token);
+            if (bikes && bikes.length > 0) {
+              await savePairedBike(bikes[0]);
+              setPairedBikeState(bikes[0]);
+            }
+          } catch {
+            // Best-effort recovery only - fall through to ClaimScreen.
+          }
         }
       })
       .finally(() => setLoading(false));
@@ -52,6 +59,17 @@ export default function App() {
 
   const handleUnpair = async () => {
     await deletePairedBike();
+    setPairedBikeState(null);
+  };
+
+  // Clears the stored session so a stale/foreign-signed token (e.g. from
+  // switching which backend the app points at) can't keep the app stuck
+  // retrying requests the server will only ever reject.
+  const handleLogout = async () => {
+    await deleteAuthToken();
+    await deletePairedBike();
+    setAuthTokenState(null);
+    setUser(null);
     setPairedBikeState(null);
   };
 
@@ -83,9 +101,9 @@ export default function App() {
     <View style={styles.container}>
       <ExpoStatusBar style="light" translucent backgroundColor="#0F172A" />
       {pairedBike ? (
-        <MapDashboardScreen bike={pairedBike} onUnpair={handleUnpair} />
+        <MapDashboardScreen bike={pairedBike} onUnpair={handleUnpair} onLogout={handleLogout} />
       ) : (
-        <ClaimScreen onClaimSuccess={handleClaimSuccess} />
+        <ClaimScreen authToken={authToken} onClaimSuccess={handleClaimSuccess} onLogout={handleLogout} />
       )}
     </View>
   );
