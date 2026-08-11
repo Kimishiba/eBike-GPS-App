@@ -232,6 +232,7 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
             latitudeDelta: 0.005,
             longitudeDelta: 0.005,
           }}
+          mapPadding={{ top: 0, right: 0, bottom: 280, left: 0 }}
         >
           {/* Safe Zone Geofence Overlay Ring */}
           <Circle
@@ -243,7 +244,7 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({ bike, on
           />
 
           {/* Live Animated Bike Marker */}
-          <Marker coordinate={location} title={bike?.nickname || 'eBike'}>
+          <Marker coordinate={location} title={bike?.nickname || 'eBike'} zIndex={999}>
             <View style={styles.markerContainer}>
               <Text style={styles.markerEmoji}>🚲</Text>
             </View>
