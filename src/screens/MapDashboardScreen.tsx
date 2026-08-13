@@ -148,12 +148,13 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
         if (batVal !== undefined && batVal !== null) setBatteryPercent(Number(batVal));
 
         const sats = frame.sats_used ?? (frame as any).satsUsed ?? (frame as any).sats;
-        if (sats !== undefined && sats !== null) setSatsUsed(Number(sats));
+        const satsVal = sats !== undefined && sats !== null && !isNaN(Number(sats)) ? Number(sats) : null;
+        if (satsVal !== null) setSatsUsed(satsVal);
 
         setLastFrameAt(Date.now());
 
-        // Append live frame telemetry entry to activity log
-        const logMsg = `Frame received: ${speedVal !== null ? `${speedVal.toFixed(1)} km/h` : '0.0 km/h'}, Bat: ${batVal !== undefined ? `${batVal}%` : '--'}, Sats: ${sats ?? '--'}`;
+        // Append live frame telemetry entry to activity log with unified satellite count
+        const logMsg = `Frame received: ${speedVal !== null ? `${speedVal.toFixed(1)} km/h` : '0.0 km/h'}, Bat: ${batVal !== undefined ? `${batVal}%` : '--'}, Sats: ${satsVal !== null ? satsVal : '--'}`;
         setActivityLogs((prev) => {
           // Avoid duplicate entries if last entry message is identical
           if (prev.length > 0 && prev[0].msg === logMsg) return prev;
