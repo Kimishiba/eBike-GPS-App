@@ -7,7 +7,10 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "Allows eBike GPS App to auto-disarm alarm and measure BLE proximity to your paired bike."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,7 +25,15 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": ["peripheral", "central"],
+          "bluetoothAlwaysPermission": "Allows eBike GPS App to auto-disarm alarm and measure BLE proximity to your paired bike."
+        }
+      ]
     ]
   }
 }
