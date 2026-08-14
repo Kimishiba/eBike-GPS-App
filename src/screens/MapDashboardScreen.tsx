@@ -307,13 +307,11 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
       <View style={styles.topHeader}>
         <View style={styles.headerLeft}>
           <View style={styles.brandRow}>
-            <Text style={styles.brandIcon}>🛡️</Text>
-            <Text style={styles.brandTitle}>{bike?.nickname || 'IRON STEED'}</Text>
             <Text style={styles.brandIcon}>⚡</Text>
-            <Text style={styles.brandTitle}>MYTHIC EBike</Text>
+            <Text style={styles.brandTitle}>{bike?.nickname || 'MYTHIC EBike'}</Text>
           </View>
           <Text style={styles.headerSubtitle}>
-            {bike?.nickname || 'Iron Steed Tracker'} | {formatLastUpdate(lastFrameAt, nowTick)}
+            {formatLastUpdate(lastFrameAt, nowTick)}
           </Text>
         </View>
 
@@ -338,7 +336,11 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
             onPress={() => setShowBleModal(true)}
           >
             <Text style={styles.shieldIcon}>{btBadge.icon}</Text>
-            <Text style={[styles.shieldText, { color: btBadge.color }]} numberOfLines={1}>
+            <Text
+              style={[styles.shieldText, { color: btBadge.color }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
               {btBadge.label}
             </Text>
           </TouchableOpacity>
@@ -348,7 +350,11 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
             onPress={() => setShowUplinkModal(true)}
           >
             <Text style={styles.shieldIcon}>{uplinkBadge.icon}</Text>
-            <Text style={[styles.shieldText, { color: uplinkBadge.color }]} numberOfLines={1}>
+            <Text
+              style={[styles.shieldText, { color: uplinkBadge.color }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
               {uplinkBadge.label}
             </Text>
           </TouchableOpacity>
@@ -531,7 +537,12 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
       </ScrollView>
 
       {/* BLE Link Diagnostic Modal */}
-      <Modal visible={showBleModal} animationType="slide" transparent>
+      <Modal
+        visible={showBleModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowBleModal(false)}
+      >
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>📶 BLE LINK DIAGNOSTICS</Text>
@@ -560,7 +571,12 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
       </Modal>
 
       {/* Uplink Telemetry Diagnostic Modal */}
-      <Modal visible={showUplinkModal} animationType="slide" transparent>
+      <Modal
+        visible={showUplinkModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowUplinkModal(false)}
+      >
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>🛰️ TELEMETRY UPLINK DIAGNOSTICS</Text>
