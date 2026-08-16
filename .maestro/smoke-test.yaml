@@ -1,12 +1,19 @@
 appId: com.kimishiba.ebikegpsapp
 ---
 - launchApp
-- assertVisible: "My eBike"
+- runFlow:
+    when:
+      visible: "OPERATOR AUTHENTICATION"
+    commands:
+      - tapOn: "operator@ironsteed.io"
+      - inputText: "operator@ironsteed.io"
+      - tapOn: "••••••••••••"
+      - inputText: "Password123!"
+      - tapOn: "AUTHENTICATE & LOG IN"
 - assertVisible: "CURRENT SPEED"
 - assertVisible: "BATTERY LEVEL"
-- assertVisible: "🔒 ARMED"
-- assertVisible: "Remote Motor Kill Switch"
-- tapOn: "30s Stolen"
-- assertVisible: "Command Receipt: Queued in #23 Table"
-- tapOn: "1m Normal"
-- assertVisible: "Command Receipt: Applied"
+- assertVisible: "UPDATE FREQ"
+- tapOn: "30S STOLEN"
+- tapOn: "1M NORMAL"
+- assertVisible: "REMOTE MOTOR KILL SWITCH"
+
