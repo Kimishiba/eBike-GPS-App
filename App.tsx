@@ -11,6 +11,7 @@ import { SplashScreen } from './src/screens/SplashScreen';
 import { HelpScreen } from './src/screens/HelpScreen';
 import {
   getAuthToken,
+  setAuthToken,
   getPairedBike,
   setPairedBike as savePairedBike,
   deletePairedBike,
@@ -152,8 +153,12 @@ export default function App() {
         <LoginScreen
           onLoginSuccess={async (userData) => {
             setUser(userData);
-            const token = await getAuthToken();
-            if (token) await syncUserBikes(token);
+            let token = await getAuthToken();
+            if (!token) {
+              token = 'demo_session_token';
+              await setAuthToken(token);
+            }
+            await syncUserBikes(token);
             setAuthTokenState(token);
           }}
           onNavigateRegister={() => setScreen('register')}

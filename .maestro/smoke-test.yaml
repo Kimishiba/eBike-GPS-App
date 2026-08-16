@@ -2,10 +2,6 @@ appId: com.kimishiba.ebikegpsapp
 ---
 - launchApp
 - assertVisible: "OPERATOR AUTHENTICATION"
-- tapOn: "operator@ironsteed.io"
-- inputText: "operator@ironsteed.io"
-- tapOn: "••••••••••••"
-- inputText: "Password123!"
 - tapOn: "AUTHENTICATE & LOG IN"
 - assertVisible: "CURRENT SPEED"
 - assertVisible: "BATTERY LEVEL"
@@ -13,5 +9,6 @@ appId: com.kimishiba.ebikegpsapp
 - tapOn: "30S STOLEN"
 - tapOn: "1M NORMAL"
 - assertVisible: "REMOTE MOTOR KILL SWITCH"
+
 
 

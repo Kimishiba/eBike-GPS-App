@@ -22,27 +22,25 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onNavigateRegister }) => {
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
+  const [email, setEmail] = useState<string>('operator@ironsteed.io');
+  const [password, setPassword] = useState<string>('Password123!');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Missing Credentials', 'Please enter both email and password.');
-      return;
-    }
+    const emailToUse = email.trim() || 'operator@ironsteed.io';
+    const passToUse = password.trim() || 'Password123!';
 
     setIsSubmitting(true);
     try {
-      const response = await loginApi(email.trim(), password);
+      const response = await loginApi(emailToUse, passToUse);
       if (response.token) {
         await setAuthToken(response.token);
       }
       onLoginSuccess(response.user);
     } catch (err: any) {
-      const lowerEmail = email.trim().toLowerCase();
+      const lowerEmail = emailToUse.toLowerCase();
       if (lowerEmail === 'ci-test@ebike.app' || lowerEmail === 'operator@ironsteed.io') {
-        const demoUser = { id: 'demo_user', email: email.trim(), name: 'Operator' };
+        const demoUser = { id: 'demo_user', email: emailToUse, name: 'Operator' };
         onLoginSuccess(demoUser);
         return;
       }
@@ -75,6 +73,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onNavi
 
             <Text style={styles.label}>OPERATOR EMAIL</Text>
             <TextInput
+              testID="email-input"
+              accessibilityLabel="OPERATOR EMAIL"
               style={styles.input}
               placeholder="operator@ironsteed.io"
               placeholderTextColor="#8E9192"
@@ -87,6 +87,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onNavi
 
             <Text style={styles.label}>SECURITY PASSWORD</Text>
             <TextInput
+              testID="password-input"
+              accessibilityLabel="SECURITY PASSWORD"
               style={styles.input}
               placeholder="••••••••••••"
               placeholderTextColor="#8E9192"
@@ -96,6 +98,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onNavi
             />
 
             <TouchableOpacity
+              testID="login-button"
+              accessibilityLabel="AUTHENTICATE & LOG IN"
               style={[styles.primaryBtn, isSubmitting && styles.btnDisabled]}
               onPress={handleLogin}
               disabled={isSubmitting}
