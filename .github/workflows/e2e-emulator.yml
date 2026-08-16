@@ -38,11 +38,10 @@ jobs:
       - name: Prebuild Native Android Project
         run: npx expo prebuild --platform android --clean
 
-      - name: Export JS Bundle & Build APK
+      - name: Build Standalone Release APK
         run: |
-          npx expo export --platform android
           cd android
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon
 
       - name: Install Maestro CLI
         run: |
@@ -59,7 +58,7 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
-            adb install android/app/build/outputs/apk/debug/app-debug.apk
+            adb install android/app/build/outputs/apk/release/app-release.apk
             $HOME/.maestro/bin/maestro test .maestro/smoke-test.yaml
 
       - name: Upload Maestro Test Artifacts
