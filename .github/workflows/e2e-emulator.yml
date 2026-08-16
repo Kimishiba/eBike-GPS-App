@@ -49,7 +49,7 @@ jobs:
           api-level: 31
           target: default
           arch: x86_64
-          profile: Pixel_6
+          profile: pixel_6
           script: |
             adb install android/app/build/outputs/apk/debug/app-debug.apk
             $HOME/.maestro/bin/maestro test .maestro/smoke-test.yaml

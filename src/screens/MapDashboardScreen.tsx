@@ -9,6 +9,7 @@ import {
   Alert,
   Switch,
   StatusBar,
+  Modal,
 } from 'react-native';
 import MapView, { Marker, Circle, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -85,6 +86,10 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
   const [motorCutEnabled, setMotorCutEnabled] = useState<boolean>(false);
   const [reportingIntervalSecs, setReportingIntervalSecs] = useState<number>(60);
   const [commandStatus, setCommandStatus] = useState<string>('Uplink Active');
+
+  // Diagnostic Modals State
+  const [showBleModal, setShowBleModal] = useState<boolean>(false);
+  const [showUplinkModal, setShowUplinkModal] = useState<boolean>(false);
 
   // Logs for Activity Log accordion (live board feed)
   const [activityLogs, setActivityLogs] = useState<Array<{ ts: string; msg: string; highlight?: boolean }>>([]);
@@ -264,6 +269,37 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
     setActivityLogs((prev) => [{ ts: new Date().toTimeString().slice(0, 8), msg: nextState ? 'System ARMED' : 'System DISARMED' }, ...prev]);
   };
 
+  // Derived BT LINK Shield Label & Color
+  const getBtShieldBadge = () => {
+    if (!BLE_AUTO_DISARM_ENABLED) {
+      return { label: 'BT PAUSED', color: '#8E9192', icon: '📶' };
+    }
+    if (currentRssi !== null && currentRssi >= -75) {
+      return { label: `BT LINK (${currentRssi}dBm)`, color: '#10B981', icon: '📶' };
+    }
+    if (currentRssi !== null) {
+      return { label: `BT NEARBY (${currentRssi}dBm)`, color: '#EAB308', icon: '📶' };
+    }
+    return { label: 'BT DISCONNECTED', color: '#EF4444', icon: '📶' };
+  };
+
+  // Derived UPLINK Shield Label & Color
+  const getUplinkShieldBadge = () => {
+    if (connectionState === 'LIVE') {
+      if (satsUsed !== null && satsUsed > 0) {
+        return { label: `GPS 3D FIX (${satsUsed} SATS)`, color: '#10B981', icon: '🛰️' };
+      }
+      return { label: 'UPLINK LIVE (0 SATS)', color: '#EAB308', icon: '🛰️' };
+    }
+    if (connectionState === 'STALE') {
+      return { label: 'UPLINK STALE', color: '#EAB308', icon: '🛰️' };
+    }
+    return { label: 'UPLINK OFFLINE', color: '#EF4444', icon: '🛰️' };
+  };
+
+  const btBadge = getBtShieldBadge();
+  const uplinkBadge = getUplinkShieldBadge();
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#131314" />
@@ -272,20 +308,15 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
       <View style={styles.topHeader}>
         <View style={styles.headerLeft}>
           <View style={styles.brandRow}>
-            <Text style={styles.brandIcon}>🛡️</Text>
-            <Text style={styles.brandTitle}>{bike?.nickname || 'IRON STEED'}</Text>
+            <Text style={styles.brandIcon}>⚡</Text>
+            <Text style={styles.brandTitle}>{bike?.nickname || 'MYTHIC EBike'}</Text>
           </View>
-          <View style={styles.badgeRow}>
-            <View style={[styles.onlineBadge, { backgroundColor: CONNECTION_BADGE_COLORS[connectionState].bg }]}>
-              <Text style={[styles.onlineBadgeText, { color: CONNECTION_BADGE_COLORS[connectionState].fg }]}>
-                {connectionBadgeLabel(connectionState)}
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.lastUpdateText}>{formatLastUpdate(lastFrameAt, nowTick)}</Text>
+          <Text style={styles.headerSubtitle}>
+            {formatLastUpdate(lastFrameAt, nowTick)}
+          </Text>
         </View>
 
-        <View style={{ alignItems: 'flex-end' }}>
+        <View style={styles.headerRight}>
           <TouchableOpacity
             style={[styles.armBtn, alarmArmed ? styles.armBtnActive : styles.armBtnDisarmed]}
             onPress={handleToggleArmStatus}
@@ -301,14 +332,33 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Status Shields Row */}
         <View style={styles.statusShieldsRow}>
-          <View style={styles.statusShieldCard}>
-            <Text style={styles.shieldIcon}>📶</Text>
-            <Text style={styles.shieldText}>BT LINK</Text>
-          </View>
-          <View style={styles.statusShieldCard}>
-            <Text style={styles.shieldIcon}>🛰️</Text>
-            <Text style={styles.shieldText}>UPLINK</Text>
-          </View>
+          <TouchableOpacity
+            style={[styles.statusShieldCard, { borderColor: btBadge.color }]}
+            onPress={() => setShowBleModal(true)}
+          >
+            <Text style={styles.shieldIcon}>{btBadge.icon}</Text>
+            <Text
+              style={[styles.shieldText, { color: btBadge.color }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {btBadge.label}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.statusShieldCard, { borderColor: uplinkBadge.color }]}
+            onPress={() => setShowUplinkModal(true)}
+          >
+            <Text style={styles.shieldIcon}>{uplinkBadge.icon}</Text>
+            <Text
+              style={[styles.shieldText, { color: uplinkBadge.color }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {uplinkBadge.label}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Tactical Map Container */}
@@ -486,6 +536,74 @@ export const MapDashboardScreen: React.FC<MapDashboardScreenProps> = ({
           <Text style={styles.logoutBtnText}>LOG OUT</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* BLE Link Diagnostic Modal */}
+      <Modal
+        visible={showBleModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowBleModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>📶 BLE LINK DIAGNOSTICS</Text>
+            <View style={styles.specRow}>
+              <Text style={styles.specLabel}>PAIRED HARDWARE UUID</Text>
+              <Text style={styles.specVal}>{bike?.hardwareId || bike?.id || 'Unknown'}</Text>
+            </View>
+            <View style={styles.specRow}>
+              <Text style={styles.specLabel}>BLE GATT STATUS</Text>
+              <Text style={[styles.specVal, { color: btBadge.color }]}>{btBadge.label}</Text>
+            </View>
+            <View style={styles.specRow}>
+              <Text style={styles.specLabel}>SIGNAL STRENGTH (RSSI)</Text>
+              <Text style={styles.specVal}>{currentRssi !== null ? `${currentRssi} dBm` : 'No Signal'}</Text>
+            </View>
+            <View style={styles.specRow}>
+              <Text style={styles.specLabel}>PROXIMITY THRESHOLD</Text>
+              <Text style={styles.specVal}>&gt;= -75 dBm (~2-3m)</Text>
+            </View>
+
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowBleModal(false)}>
+              <Text style={styles.modalCloseBtnText}>CLOSE DIAGNOSTICS</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Uplink Telemetry Diagnostic Modal */}
+      <Modal
+        visible={showUplinkModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowUplinkModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>🛰️ TELEMETRY UPLINK DIAGNOSTICS</Text>
+            <View style={styles.specRow}>
+              <Text style={styles.specLabel}>FLY.IO BROKER ENDPOINT</Text>
+              <Text style={styles.specVal}>velo-lock-tracker.fly.dev</Text>
+            </View>
+            <View style={styles.specRow}>
+              <Text style={styles.specLabel}>CONNECTION BADGE</Text>
+              <Text style={[styles.specVal, { color: uplinkBadge.color }]}>{uplinkBadge.label}</Text>
+            </View>
+            <View style={styles.specRow}>
+              <Text style={styles.specLabel}>SATELLITE FIX COUNT</Text>
+              <Text style={styles.specVal}>{satsUsed !== null ? `${satsUsed} Satellites` : 'Awaiting Fix'}</Text>
+            </View>
+            <View style={styles.specRow}>
+              <Text style={styles.specLabel}>LAST TELEMETRY FRAME</Text>
+              <Text style={styles.specVal}>{formatLastUpdate(lastFrameAt, nowTick)}</Text>
+            </View>
+
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowUplinkModal(false)}>
+              <Text style={styles.modalCloseBtnText}>CLOSE DIAGNOSTICS</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -507,6 +625,14 @@ const styles = StyleSheet.create({
   },
   headerLeft: {
     flex: 1,
+  },
+  headerSubtitle: {
+    color: '#8E9192',
+    fontSize: 10,
+    marginTop: 2,
+  },
+  headerRight: {
+    alignItems: 'flex-end',
   },
   brandRow: {
     flexDirection: 'row',
@@ -880,5 +1006,59 @@ const styles = StyleSheet.create({
   },
   navLabelActive: {
     color: '#FFEA00',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  modalCard: {
+    backgroundColor: '#1C1B1C',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#363435',
+    padding: 20,
+  },
+  modalTitle: {
+    color: '#FFEA00',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalCloseBtn: {
+    backgroundColor: '#2B292A',
+    borderWidth: 1,
+    borderColor: '#363435',
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 4,
+    marginTop: 20,
+  },
+  modalCloseBtnText: {
+    color: '#FFEA00',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+  specRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2B292A',
+  },
+  specLabel: {
+    color: '#8E9192',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  specVal: {
+    color: '#F3F4F6',
+    fontSize: 10,
+    fontWeight: '600',
   },
 });
