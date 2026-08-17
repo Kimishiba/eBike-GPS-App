@@ -1,0 +1,38 @@
+name: CodeVibes AI Code Audit
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  codevibes-audit:
+    name: CodeVibes AI Security & Health Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run CodeVibes AI Code Scan
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          echo "=== Starting CodeVibes AI Scan ==="
+          npx --yes codevibes-cli analyze ./ --format markdown > codevibes-report.md || echo "CodeVibes CLI completed with warnings"
+          cat codevibes-report.md
+
+      - name: Upload Audit Report Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codevibes-audit-report
+          path: codevibes-report.md
